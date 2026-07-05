@@ -1,14 +1,16 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useNavigate } from 'react-router-dom'
+import { CreditCard, UserRoundCheck } from 'lucide-react'
 import { z } from 'zod'
 import { getApiErrorMessage } from '@/shared/api/httpClient'
 import { paymentsApi, profilesApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
 import { FormError } from '@/shared/components/FormError'
 import { SelectField, TextField } from '@/shared/components/FormControls'
+import { LoadingBlock } from '@/shared/components/LoadingBlock'
 import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { StatusBadge } from '@/shared/components/StatusBadge'
@@ -24,18 +26,12 @@ const doctorSchema = z.object({
   fullName: z.string().min(3, 'Nombre requerido'),
 })
 
-const existingDoctorSchema = z.object({
-  doctorProfileId: z.coerce.number().int().positive('ID requerido'),
-})
-
 const subscriptionSchema = z.object({
   billingCycle: z.enum(['MONTHLY', 'ANNUALLY']),
   planType: z.enum(['INSTITUTION_BASIC', 'INSTITUTION_PREMIUM']),
 })
 
 type DoctorForm = z.infer<typeof doctorSchema>
-type ExistingDoctorFormInput = z.input<typeof existingDoctorSchema>
-type ExistingDoctorForm = z.output<typeof existingDoctorSchema>
 type SubscriptionForm = z.infer<typeof subscriptionSchema>
 
 export function OnboardingDoctorPage() {
@@ -50,13 +46,16 @@ export function OnboardingDoctorPage() {
     resolver: zodResolver(doctorSchema),
     defaultValues: { fullName: workspace.doctorProfile?.fullName ?? '' },
   })
-  const existingDoctorForm = useForm<ExistingDoctorFormInput, unknown, ExistingDoctorForm>({
-    resolver: zodResolver(existingDoctorSchema),
-    defaultValues: { doctorProfileId: workspace.doctorProfile?.id ?? 0 },
-  })
   const subscriptionForm = useForm<SubscriptionForm>({
     resolver: zodResolver(subscriptionSchema),
     defaultValues: { billingCycle: 'MONTHLY', planType: 'INSTITUTION_BASIC' },
+  })
+
+  const currentDoctorQuery = useQuery({
+    enabled: Boolean(user?.id),
+    queryFn: profilesApi.getCurrentDoctor,
+    queryKey: ['current-doctor-profile', user?.id],
+    retry: false,
   })
 
   const activeSubscriptionQuery = useQuery({
@@ -66,26 +65,26 @@ export function OnboardingDoctorPage() {
     retry: false,
   })
 
+  useEffect(() => {
+    if (!currentDoctorQuery.data) return
+    saveDoctorProfile(currentDoctorQuery.data)
+    setWorkspace(getClinicalWorkspace(user?.id))
+    doctorForm.reset({ fullName: currentDoctorQuery.data.fullName })
+  }, [currentDoctorQuery.data, doctorForm, user?.id])
+
   const createDoctorMutation = useMutation({
     mutationFn: profilesApi.createDoctor,
     onSuccess: (doctorProfile) => {
       saveDoctorProfile(doctorProfile)
       setWorkspace(getClinicalWorkspace(user?.id))
+      void queryClient.invalidateQueries({ queryKey: ['current-doctor-profile', user?.id] })
     },
   })
 
-  const loadDoctorMutation = useMutation({
-    mutationFn: profilesApi.getDoctor,
-    onSuccess: (doctorProfile) => {
-      saveDoctorProfile(doctorProfile)
-      setWorkspace(getClinicalWorkspace(user?.id))
-    },
-  })
-
-  const createSubscriptionMutation = useMutation({
-    mutationFn: paymentsApi.createSubscription,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
+  const checkoutMutation = useMutation({
+    mutationFn: paymentsApi.createCheckoutSession,
+    onSuccess: (checkout) => {
+      window.location.assign(checkout.checkoutUrl)
     },
   })
 
@@ -98,20 +97,11 @@ export function OnboardingDoctorPage() {
     }
   }
 
-  async function loadDoctor(values: ExistingDoctorForm) {
+  async function startCheckout(values: SubscriptionForm) {
+    if (!user || !hasDoctorProfile) return
     setError(null)
     try {
-      await loadDoctorMutation.mutateAsync(values.doctorProfileId)
-    } catch (submitError) {
-      setError(getApiErrorMessage(submitError))
-    }
-  }
-
-  async function createSubscription(values: SubscriptionForm) {
-    if (!user) return
-    setError(null)
-    try {
-      await createSubscriptionMutation.mutateAsync({
+      await checkoutMutation.mutateAsync({
         billingCycle: values.billingCycle,
         commercialLine: 'INSTITUTION',
         planType: values.planType,
@@ -140,26 +130,21 @@ export function OnboardingDoctorPage() {
         <Panel>
           <PanelHeader eyebrow="Perfil medico" title="Datos del doctor" />
           <PanelBody className="space-y-6">
-            <form className="grid grid-cols-[1fr_auto] items-end gap-3" onSubmit={doctorForm.handleSubmit(createDoctor)}>
+            {currentDoctorQuery.isLoading ? <LoadingBlock /> : null}
+
+            <form
+              className="grid grid-cols-[1fr_auto] items-end gap-3"
+              onSubmit={doctorForm.handleSubmit(createDoctor)}
+            >
               <TextField
+                disabled={hasDoctorProfile}
                 error={doctorForm.formState.errors.fullName?.message}
                 label="Nombre completo"
                 {...doctorForm.register('fullName')}
               />
-              <Button isLoading={createDoctorMutation.isPending} type="submit">
+              <Button disabled={hasDoctorProfile} isLoading={createDoctorMutation.isPending} type="submit">
+                <UserRoundCheck className="h-4 w-4" aria-hidden="true" />
                 Crear perfil
-              </Button>
-            </form>
-
-            <form className="grid grid-cols-[1fr_auto] items-end gap-3" onSubmit={existingDoctorForm.handleSubmit(loadDoctor)}>
-              <TextField
-                error={existingDoctorForm.formState.errors.doctorProfileId?.message}
-                label="Perfil medico existente"
-                type="number"
-                {...existingDoctorForm.register('doctorProfileId')}
-              />
-              <Button isLoading={loadDoctorMutation.isPending} type="submit" variant="secondary">
-                Vincular
               </Button>
             </form>
 
@@ -167,6 +152,9 @@ export function OnboardingDoctorPage() {
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
                 <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Perfil listo</p>
                 <p className="mt-1 text-sm font-bold text-emerald-900">{workspace.doctorProfile.fullName}</p>
+                <p className="mt-1 text-xs font-semibold text-emerald-800">
+                  Vinculado automaticamente al usuario {user?.username}
+                </p>
               </div>
             ) : (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
@@ -191,7 +179,7 @@ export function OnboardingDoctorPage() {
               </div>
             ) : null}
 
-            <form className="space-y-4" onSubmit={subscriptionForm.handleSubmit(createSubscription)}>
+            <form className="space-y-4" onSubmit={subscriptionForm.handleSubmit(startCheckout)}>
               <SelectField
                 error={subscriptionForm.formState.errors.planType?.message}
                 label="Plan"
@@ -210,8 +198,9 @@ export function OnboardingDoctorPage() {
                 ]}
                 {...subscriptionForm.register('billingCycle')}
               />
-              <Button isLoading={createSubscriptionMutation.isPending} type="submit">
-                Crear suscripcion
+              <Button disabled={!hasDoctorProfile} isLoading={checkoutMutation.isPending} type="submit">
+                <CreditCard className="h-4 w-4" aria-hidden="true" />
+                Ir a Stripe
               </Button>
             </form>
           </PanelBody>

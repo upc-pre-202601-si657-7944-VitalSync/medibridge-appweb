@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { CreditCard } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { CreditCard, RefreshCw } from 'lucide-react'
 import { z } from 'zod'
 import { getApiErrorMessage } from '@/shared/api/httpClient'
 import { paymentsApi } from '@/shared/api/medibridgeApi'
@@ -28,6 +29,8 @@ type SubscriptionForm = z.infer<typeof subscriptionSchema>
 export function SubscriptionsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const checkoutStatus = searchParams.get('checkout')
   const [error, setError] = useState<string | null>(null)
   const form = useForm<SubscriptionForm>({
     resolver: zodResolver(subscriptionSchema),
@@ -56,17 +59,18 @@ export function SubscriptionsPage() {
     retry: false,
   })
 
-  const createSubscriptionMutation = useMutation({
-    mutationFn: (values: SubscriptionForm) =>
-      paymentsApi.createSubscription({
-        billingCycle: values.billingCycle,
-        commercialLine: 'INSTITUTION',
-        planType: values.planType,
-        userId: user!.id,
-      }),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
-      void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
+  useEffect(() => {
+    if (checkoutStatus !== 'success' || !user?.id) return
+    void queryClient.invalidateQueries({ queryKey: ['active-subscription', user.id] })
+    void queryClient.invalidateQueries({ queryKey: ['subscriptions', user.id] })
+    void queryClient.invalidateQueries({ queryKey: ['invoices', user.id] })
+    setSearchParams({}, { replace: true })
+  }, [checkoutStatus, queryClient, setSearchParams, user?.id])
+
+  const checkoutMutation = useMutation({
+    mutationFn: paymentsApi.createCheckoutSession,
+    onSuccess: (checkout) => {
+      window.location.assign(checkout.checkoutUrl)
     },
   })
 
@@ -83,6 +87,7 @@ export function SubscriptionsPage() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
+      void queryClient.invalidateQueries({ queryKey: ['invoices', user?.id] })
     },
   })
 
@@ -95,16 +100,33 @@ export function SubscriptionsPage() {
     }
   }
 
+  async function startCheckout(values: SubscriptionForm) {
+    if (!user) return
+    await runAction(() =>
+      checkoutMutation.mutateAsync({
+        billingCycle: values.billingCycle,
+        commercialLine: 'INSTITUTION',
+        planType: values.planType,
+        userId: user.id,
+      }),
+    )
+  }
+
   return (
     <>
       <PageHeader eyebrow="Payments" title="Suscripcion institucional" />
       <FormError message={error} />
+      {checkoutStatus === 'cancelled' ? (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
+          Checkout cancelado. Puedes volver a intentarlo cuando quieras.
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-[420px_1fr] gap-6">
         <Panel>
-          <PanelHeader eyebrow="Plan" title="Crear suscripcion" />
+          <PanelHeader eyebrow="Stripe Checkout" title="Comprar o mejorar plan" />
           <PanelBody>
-            <form className="space-y-4" onSubmit={form.handleSubmit((values) => runAction(() => createSubscriptionMutation.mutateAsync(values)))}>
+            <form className="space-y-4" onSubmit={form.handleSubmit(startCheckout)}>
               <SelectField
                 error={form.formState.errors.planType?.message}
                 label="Plan"
@@ -123,9 +145,9 @@ export function SubscriptionsPage() {
                 ]}
                 {...form.register('billingCycle')}
               />
-              <Button className="w-full" isLoading={createSubscriptionMutation.isPending} type="submit">
+              <Button className="w-full" isLoading={checkoutMutation.isPending} type="submit">
                 <CreditCard className="h-4 w-4" aria-hidden="true" />
-                Crear suscripcion
+                Ir a Stripe
               </Button>
             </form>
           </PanelBody>
@@ -146,16 +168,20 @@ export function SubscriptionsPage() {
                     </StatusBadge>
                   </div>
                   <p className="text-sm font-semibold text-slate-600">
-                    {enumLabel(activeSubscriptionQuery.data.plan.planType)} · {formatCurrency(activeSubscriptionQuery.data.plan.price, activeSubscriptionQuery.data.plan.currency)}
+                    {enumLabel(activeSubscriptionQuery.data.plan.planType)} -{' '}
+                    {formatCurrency(activeSubscriptionQuery.data.plan.price, activeSubscriptionQuery.data.plan.currency)}
                   </p>
                   <p className="mt-2 text-sm font-semibold text-slate-600">
-                    Inicio {formatDate(activeSubscriptionQuery.data.startedAt)} · Fin {formatDate(activeSubscriptionQuery.data.currentPeriodEnd)}
+                    Inicio {formatDate(activeSubscriptionQuery.data.startedAt)} - Fin{' '}
+                    {formatDate(activeSubscriptionQuery.data.currentPeriodEnd)}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button
                     isLoading={cancelSubscriptionMutation.isPending}
-                    onClick={() => runAction(() => cancelSubscriptionMutation.mutateAsync(activeSubscriptionQuery.data.id))}
+                    onClick={() =>
+                      runAction(() => cancelSubscriptionMutation.mutateAsync(activeSubscriptionQuery.data.id))
+                    }
                     variant="danger"
                   >
                     Cancelar
@@ -165,6 +191,7 @@ export function SubscriptionsPage() {
                     onClick={() => runAction(() => renewSubscriptionMutation.mutateAsync(activeSubscriptionQuery.data.id))}
                     variant="secondary"
                   >
+                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
                     Renovar
                   </Button>
                 </div>

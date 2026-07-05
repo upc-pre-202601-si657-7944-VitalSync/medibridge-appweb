@@ -5,8 +5,10 @@ import type {
   ClinicalAlert,
   ClinicalReport,
   ChatMessage,
+  CheckoutSessionResponse,
   ConnectedUser,
   ConnectUserRequest,
+  CreateCheckoutSessionRequest,
   CreateMedicationScheduleRequest,
   CreateSubscriptionRequest,
   DashboardMetrics,
@@ -32,6 +34,7 @@ import type {
   SignUpRequest,
   SkipDoseRequest,
   Subscription,
+  UpdateMedicationRequest,
   UpdateMedicationStockRequest,
   UserResource,
 } from '@/shared/types/api'
@@ -72,6 +75,10 @@ export const profilesApi = {
     )
     return data
   },
+  async getCurrentDoctor() {
+    const { data } = await httpClient.get<DoctorProfile>('/api/v1/profiles/doctors/me')
+    return data
+  },
   async createPatient(payload: { fullName: string }) {
     const { data } = await httpClient.post<PatientProfile>('/api/v1/profiles/patients', payload)
     return data
@@ -80,6 +87,10 @@ export const profilesApi = {
     const { data } = await httpClient.get<PatientProfile>(
       `/api/v1/profiles/patients/${patientId}`,
     )
+    return data
+  },
+  async listMyPatients() {
+    const { data } = await httpClient.get<PatientProfile[]>('/api/v1/profiles/patients/my-care-team')
     return data
   },
   async assignDoctor(patientId: number, doctorProfileId: number) {
@@ -95,6 +106,13 @@ export const paymentsApi = {
     const { data } = await httpClient.post<Subscription>('/api/v1/subscriptions', payload)
     return data
   },
+  async createCheckoutSession(payload: CreateCheckoutSessionRequest) {
+    const { data } = await httpClient.post<CheckoutSessionResponse>(
+      '/api/v1/subscriptions/checkout',
+      payload,
+    )
+    return data
+  },
   async getActiveSubscription(userId: number) {
     const { data } = await httpClient.get<Subscription>(
       `/api/v1/subscriptions/users/${userId}/active`,
@@ -102,10 +120,10 @@ export const paymentsApi = {
     return data
   },
   async listSubscriptions(userId: number) {
-    const { data } = await httpClient.get<Subscription[]>(
+    const { data } = await httpClient.get<Subscription | Subscription[]>(
       `/api/v1/subscriptions/users/${userId}`,
     )
-    return data
+    return Array.isArray(data) ? data : [data]
   },
   async listInvoices(userId: number) {
     const { data } = await httpClient.get<Invoice[]>(`/api/v1/invoices/users/${userId}`)
@@ -160,6 +178,13 @@ export const medicationApi = {
   async updateStock(medicationId: number, payload: UpdateMedicationStockRequest) {
     const { data } = await httpClient.patch<Medication>(
       `/api/v1/medications/${medicationId}/stock`,
+      payload,
+    )
+    return data
+  },
+  async updateMedication(medicationId: number, payload: UpdateMedicationRequest) {
+    const { data } = await httpClient.patch<Medication>(
+      `/api/v1/medications/${medicationId}`,
       payload,
     )
     return data

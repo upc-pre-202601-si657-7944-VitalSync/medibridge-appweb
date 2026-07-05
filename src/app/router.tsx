@@ -42,6 +42,7 @@ export const router = createBrowserRouter([
           { element: <DashboardPage />, path: '/dashboard' },
           { element: <OnboardingDoctorPage />, path: '/onboarding/doctor' },
           { element: <PatientsPage />, path: '/patients' },
+          { element: <MedicationPage />, path: '/medications' },
           { element: <NewPatientPage />, path: '/patients/new' },
           { element: <PatientOverviewPage />, path: '/patients/:patientId' },
           { element: <CareTeamPage />, path: '/patients/:patientId/care-team' },

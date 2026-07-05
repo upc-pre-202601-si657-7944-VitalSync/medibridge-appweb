@@ -24,6 +24,7 @@ import { getClinicalWorkspace } from '@/shared/utils/clinicalWorkspace'
 const primaryNav = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
   { icon: UsersRound, label: 'Pacientes', to: '/patients' },
+  { icon: Pill, label: 'Medicacion', to: '/medications' },
   { icon: CreditCard, label: 'Suscripcion', to: '/subscriptions' },
   { icon: MessageSquareText, label: 'Chat', to: '/chat' },
   { icon: Bell, label: 'Notificaciones', to: '/notifications' },

@@ -96,6 +96,12 @@ export type CreateSubscriptionRequest = {
   billingCycle: BillingCycle
 }
 
+export type CreateCheckoutSessionRequest = CreateSubscriptionRequest
+
+export type CheckoutSessionResponse = {
+  checkoutUrl: string
+}
+
 export type InvoiceStatus = 'PENDING' | 'PAID' | 'FAILED'
 
 export type Invoice = {
@@ -159,6 +165,8 @@ export type RegisterMedicationRequest = {
   lowStockThreshold: number
   expirationDate: string
 }
+
+export type UpdateMedicationRequest = Omit<RegisterMedicationRequest, 'patientId'>
 
 export type MedicationSchedule = {
   id: number
