@@ -34,7 +34,14 @@ httpClient.interceptors.response.use(
 export function getApiErrorMessage(error: unknown) {
   if (axios.isAxiosError<ApiErrorResponse>(error)) {
     const payload = error.response?.data
-    return payload?.message || payload?.error || error.message
+    const message = payload?.message || payload?.error || error.message
+    if (message.includes('account or business name') && message.includes('Checkout')) {
+      return 'Stripe necesita que configures el nombre de la cuenta o negocio antes de abrir Checkout. Revisalo en Dashboard > Settings > Account details.'
+    }
+    if (message.startsWith('Stripe checkout session circuit breaker fallback: ')) {
+      return message.replace('Stripe checkout session circuit breaker fallback: ', '')
+    }
+    return message
   }
 
   if (error instanceof Error) return error.message

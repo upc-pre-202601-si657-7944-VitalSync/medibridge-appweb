@@ -6,6 +6,7 @@ import type {
   ClinicalReport,
   ChatMessage,
   CheckoutSessionResponse,
+  ConfirmCheckoutSessionRequest,
   ConnectedUser,
   ConnectUserRequest,
   CreateCheckoutSessionRequest,
@@ -109,6 +110,20 @@ export const paymentsApi = {
   async createCheckoutSession(payload: CreateCheckoutSessionRequest) {
     const { data } = await httpClient.post<CheckoutSessionResponse>(
       '/api/v1/subscriptions/checkout',
+      payload,
+    )
+    return data
+  },
+  async confirmCheckoutSession(payload: ConfirmCheckoutSessionRequest) {
+    const { data } = await httpClient.post<Subscription>(
+      '/api/v1/subscriptions/checkout/confirm',
+      payload,
+    )
+    return data
+  },
+  async approveMockSubscription(payload: CreateCheckoutSessionRequest) {
+    const { data } = await httpClient.post<Subscription>(
+      '/api/v1/subscriptions/mock/approve',
       payload,
     )
     return data

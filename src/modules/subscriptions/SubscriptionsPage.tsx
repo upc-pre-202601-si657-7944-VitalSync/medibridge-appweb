@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
-import { CreditCard, RefreshCw } from 'lucide-react'
+import { CheckCircle2, CreditCard, RefreshCw, XCircle } from 'lucide-react'
 import { z } from 'zod'
+import { env } from '@/config/env'
 import { getApiErrorMessage } from '@/shared/api/httpClient'
 import { paymentsApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
@@ -31,7 +32,10 @@ export function SubscriptionsPage() {
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const checkoutStatus = searchParams.get('checkout')
+  const checkoutSessionId = searchParams.get('session_id')
+  const confirmingSessionRef = useRef<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [mockMessage, setMockMessage] = useState<string | null>(null)
   const form = useForm<SubscriptionForm>({
     resolver: zodResolver(subscriptionSchema),
     defaultValues: {
@@ -59,18 +63,34 @@ export function SubscriptionsPage() {
     retry: false,
   })
 
-  useEffect(() => {
-    if (checkoutStatus !== 'success' || !user?.id) return
-    void queryClient.invalidateQueries({ queryKey: ['active-subscription', user.id] })
-    void queryClient.invalidateQueries({ queryKey: ['subscriptions', user.id] })
-    void queryClient.invalidateQueries({ queryKey: ['invoices', user.id] })
-    setSearchParams({}, { replace: true })
-  }, [checkoutStatus, queryClient, setSearchParams, user?.id])
-
   const checkoutMutation = useMutation({
     mutationFn: paymentsApi.createCheckoutSession,
     onSuccess: (checkout) => {
       window.location.assign(checkout.checkoutUrl)
+    },
+  })
+
+  const confirmCheckoutMutation = useMutation({
+    mutationFn: paymentsApi.confirmCheckoutSession,
+    onSuccess: () => {
+      setMockMessage('Pago confirmado por Stripe. La suscripcion quedo activa.')
+      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
+      void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
+      void queryClient.invalidateQueries({ queryKey: ['invoices', user?.id] })
+      setSearchParams({}, { replace: true })
+    },
+    onError: (submitError) => {
+      setError(getApiErrorMessage(submitError))
+    },
+  })
+
+  const approveMockSubscriptionMutation = useMutation({
+    mutationFn: paymentsApi.approveMockSubscription,
+    onSuccess: () => {
+      setMockMessage('Pago mock aprobado. La suscripcion quedo activa localmente.')
+      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
+      void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
+      void queryClient.invalidateQueries({ queryKey: ['invoices', user?.id] })
     },
   })
 
@@ -91,8 +111,31 @@ export function SubscriptionsPage() {
     },
   })
 
+  useEffect(() => {
+    if (checkoutStatus !== 'success' || !user?.id) return
+    if (!checkoutSessionId) {
+      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user.id] })
+      void queryClient.invalidateQueries({ queryKey: ['subscriptions', user.id] })
+      void queryClient.invalidateQueries({ queryKey: ['invoices', user.id] })
+      setSearchParams({}, { replace: true })
+      return
+    }
+    if (confirmingSessionRef.current === checkoutSessionId) return
+    if (confirmCheckoutMutation.isPending) return
+    confirmingSessionRef.current = checkoutSessionId
+    confirmCheckoutMutation.mutate({ sessionId: checkoutSessionId })
+  }, [
+    checkoutSessionId,
+    checkoutStatus,
+    confirmCheckoutMutation,
+    queryClient,
+    setSearchParams,
+    user?.id,
+  ])
+
   async function runAction(action: () => Promise<unknown>) {
     setError(null)
+    setMockMessage(null)
     try {
       await action()
     } catch (submitError) {
@@ -102,6 +145,7 @@ export function SubscriptionsPage() {
 
   async function startCheckout(values: SubscriptionForm) {
     if (!user) return
+    setMockMessage(null)
     await runAction(() =>
       checkoutMutation.mutateAsync({
         billingCycle: values.billingCycle,
@@ -112,6 +156,25 @@ export function SubscriptionsPage() {
     )
   }
 
+  async function approveMockPayment() {
+    if (!user) return
+    const values = form.getValues()
+    setMockMessage(null)
+    await runAction(() =>
+      approveMockSubscriptionMutation.mutateAsync({
+        billingCycle: values.billingCycle,
+        commercialLine: 'INSTITUTION',
+        planType: values.planType,
+        userId: user.id,
+      }),
+    )
+  }
+
+  function rejectMockPayment() {
+    setMockMessage(null)
+    setError('Pago mock rechazado: fondos insuficientes. Usa este caso para probar estados de error.')
+  }
+
   return (
     <>
       <PageHeader eyebrow="Payments" title="Suscripcion institucional" />
@@ -119,6 +182,11 @@ export function SubscriptionsPage() {
       {checkoutStatus === 'cancelled' ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
           Checkout cancelado. Puedes volver a intentarlo cuando quieras.
+        </div>
+      ) : null}
+      {mockMessage ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
+          {mockMessage}
         </div>
       ) : null}
 
@@ -149,6 +217,29 @@ export function SubscriptionsPage() {
                 <CreditCard className="h-4 w-4" aria-hidden="true" />
                 Ir a Stripe
               </Button>
+
+              {env.enablePaymentMocks ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Modo dev
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      isLoading={approveMockSubscriptionMutation.isPending}
+                      onClick={approveMockPayment}
+                      type="button"
+                      variant="secondary"
+                    >
+                      <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                      Aprobar
+                    </Button>
+                    <Button onClick={rejectMockPayment} type="button" variant="secondary">
+                      <XCircle className="h-4 w-4" aria-hidden="true" />
+                      Rechazar
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </form>
           </PanelBody>
         </Panel>

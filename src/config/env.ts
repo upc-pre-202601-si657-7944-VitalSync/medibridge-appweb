@@ -6,4 +6,5 @@ if (!apiBaseUrl) {
 
 export const env = {
   apiBaseUrl,
+  enablePaymentMocks: import.meta.env.VITE_ENABLE_PAYMENT_MOCKS === 'true',
 } as const

@@ -102,6 +102,10 @@ export type CheckoutSessionResponse = {
   checkoutUrl: string
 }
 
+export type ConfirmCheckoutSessionRequest = {
+  sessionId: string
+}
+
 export type InvoiceStatus = 'PENDING' | 'PAID' | 'FAILED'
 
 export type Invoice = {
