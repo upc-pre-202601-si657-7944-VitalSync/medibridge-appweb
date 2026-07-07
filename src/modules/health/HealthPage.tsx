@@ -134,7 +134,7 @@ export function HealthPage() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <TextField error={form.formState.errors.bodyTemperature?.message} label="Temperatura" type="number" step="0.1" {...form.register('bodyTemperature')} />
-                <TextField error={form.formState.errors.painLevel?.message} label="Dolor 0-10" type="number" {...form.register('painLevel')} />
+                <TextField error={form.formState.errors.painLevel?.message} label="Dolor 0-10" type="number" min={0} max={10} {...form.register('painLevel')} />
               </div>
               <SelectField
                 error={form.formState.errors.emotionalState?.message}

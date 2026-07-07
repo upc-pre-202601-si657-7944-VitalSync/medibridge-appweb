@@ -63,15 +63,9 @@ export function ReportsPage() {
     },
   })
 
-  const generatePdfMutation = useMutation({
-    mutationFn: reportsApi.generatePdf,
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['reports', patientId] })
-    },
-  })
-
-  const downloadPdfMutation = useMutation({
+  const exportPdfMutation = useMutation({
     mutationFn: async (reportId: number) => {
+      await reportsApi.generatePdf(reportId)
       const blob = await reportsApi.downloadPdf(reportId)
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
@@ -79,6 +73,9 @@ export function ReportsPage() {
       anchor.download = `medibridge-report-${reportId}.pdf`
       anchor.click()
       URL.revokeObjectURL(url)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['reports', patientId] })
     },
   })
 
@@ -159,24 +156,15 @@ export function ReportsPage() {
                       <td>{formatDateTime(report.generatedAt)}</td>
                       <td className="max-w-sm">{report.summary}</td>
                       <td>
-                        <div className="flex gap-2">
-                          <Button
-                            isLoading={generatePdfMutation.isPending}
-                            onClick={() => runReportAction(() => generatePdfMutation.mutateAsync(report.id))}
-                            size="sm"
-                            variant="secondary"
-                          >
-                            PDF
-                          </Button>
-                          <Button
-                            isLoading={downloadPdfMutation.isPending}
-                            onClick={() => runReportAction(() => downloadPdfMutation.mutateAsync(report.id))}
-                            size="sm"
-                            variant="ghost"
-                          >
-                            <Download className="h-4 w-4" aria-hidden="true" />
-                          </Button>
-                        </div>
+                        <Button
+                          isLoading={exportPdfMutation.isPending}
+                          onClick={() => runReportAction(() => exportPdfMutation.mutateAsync(report.id))}
+                          size="sm"
+                          variant="secondary"
+                        >
+                          <Download className="h-4 w-4" aria-hidden="true" />
+                          PDF
+                        </Button>
                       </td>
                     </tr>
                   ))}
