@@ -35,6 +35,7 @@ export function ChatPage() {
   const queryClient = useQueryClient()
   const workspace = getClinicalWorkspace()
   const [recipientUserId, setRecipientUserId] = useState<number | null>(null)
+  const [recipientName, setRecipientName] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const recipientForm = useForm<RecipientFormInput, unknown, RecipientForm>({
     resolver: zodResolver(recipientSchema),
@@ -101,6 +102,8 @@ export function ChatPage() {
 
   function selectRecipient(values: RecipientForm) {
     setRecipientUserId(values.recipientUserId)
+    const known = connectedUsersQuery.data?.find((u) => u.userId === values.recipientUserId)
+    setRecipientName(known ? (known.fullName || known.username) : null)
   }
 
   return (
@@ -142,6 +145,7 @@ export function ChatPage() {
                     key={connectedUser.id}
                     onClick={() => {
                       setRecipientUserId(connectedUser.userId)
+                      setRecipientName(connectedUser.fullName || connectedUser.username)
                       recipientForm.setValue('recipientUserId', connectedUser.userId)
                     }}
                     type="button"
@@ -163,7 +167,7 @@ export function ChatPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow={recipientUserId ? `Usuario ${recipientUserId}` : 'Conversacion'} title="Mensajes" />
+          <PanelHeader eyebrow={recipientName ?? (recipientUserId ? `Usuario ${recipientUserId}` : 'Conversacion')} title="Mensajes" />
           <PanelBody className="space-y-4">
             {conversationQuery.isLoading ? (
               <LoadingBlock />

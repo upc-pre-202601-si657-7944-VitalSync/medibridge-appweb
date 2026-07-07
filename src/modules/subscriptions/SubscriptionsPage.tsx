@@ -1,9 +1,10 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
+import type { UseFormReturn } from 'react-hook-form'
 import { useSearchParams } from 'react-router-dom'
-import { CheckCircle2, CreditCard, RefreshCw, XCircle } from 'lucide-react'
+import { CalendarDays, CheckCircle2, CreditCard, RefreshCw, ShieldCheck, Star, XCircle } from 'lucide-react'
 import { z } from 'zod'
 import { env } from '@/config/env'
 import { getApiErrorMessage } from '@/shared/api/httpClient'
@@ -11,7 +12,6 @@ import { paymentsApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
 import { EmptyState } from '@/shared/components/EmptyState'
 import { FormError } from '@/shared/components/FormError'
-import { SelectField } from '@/shared/components/FormControls'
 import { LoadingBlock } from '@/shared/components/LoadingBlock'
 import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
@@ -97,7 +97,7 @@ export function SubscriptionsPage() {
   const cancelSubscriptionMutation = useMutation({
     mutationFn: paymentsApi.cancelSubscription,
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
+      queryClient.removeQueries({ queryKey: ['active-subscription', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
     },
   })
@@ -177,7 +177,7 @@ export function SubscriptionsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Payments" title="Suscripcion institucional" />
+      <PageHeader eyebrow="Pagos & Planes" title="Suscripcion institucional" />
       <FormError message={error} />
       {checkoutStatus === 'cancelled' ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
@@ -192,30 +192,14 @@ export function SubscriptionsPage() {
 
       <div className="grid grid-cols-[420px_1fr] gap-6">
         <Panel>
-          <PanelHeader eyebrow="Stripe Checkout" title="Comprar o mejorar plan" />
+          <PanelHeader eyebrow="Nuevo plan" title="Comprar o mejorar plan" />
           <PanelBody>
             <form className="space-y-4" onSubmit={form.handleSubmit(startCheckout)}>
-              <SelectField
-                error={form.formState.errors.planType?.message}
-                label="Plan"
-                options={[
-                  { label: 'Institution Basic', value: 'INSTITUTION_BASIC' },
-                  { label: 'Institution Premium', value: 'INSTITUTION_PREMIUM' },
-                ]}
-                {...form.register('planType')}
-              />
-              <SelectField
-                error={form.formState.errors.billingCycle?.message}
-                label="Facturacion"
-                options={[
-                  { label: 'Mensual', value: 'MONTHLY' },
-                  { label: 'Anual', value: 'ANNUALLY' },
-                ]}
-                {...form.register('billingCycle')}
-              />
+              <PlanSelector form={form} />
+              <BillingCycleSelector form={form} />
               <Button className="w-full" isLoading={checkoutMutation.isPending} type="submit">
                 <CreditCard className="h-4 w-4" aria-hidden="true" />
-                Ir a Stripe
+                Continuar con Stripe
               </Button>
 
               {env.enablePaymentMocks ? (
@@ -245,44 +229,65 @@ export function SubscriptionsPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Activa" title="Suscripcion actual" />
+          <PanelHeader eyebrow="Estado actual" title="Suscripcion activa" />
           <PanelBody>
             {activeSubscriptionQuery.isLoading ? (
               <LoadingBlock />
             ) : activeSubscriptionQuery.data ? (
-              <div className="grid grid-cols-[1fr_auto] items-start gap-6">
-                <div>
-                  <div className="mb-3 flex items-center gap-3">
-                    <h2 className="text-xl font-bold text-slate-950">{activeSubscriptionQuery.data.plan.displayName}</h2>
+              <div className="space-y-4">
+                <div className="rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-slate-50 p-5">
+                  <div className="mb-3 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Plan activo</p>
+                      <h2 className="mt-0.5 text-2xl font-bold text-slate-950">
+                        {activeSubscriptionQuery.data.plan.displayName}
+                      </h2>
+                    </div>
                     <StatusBadge tone={statusTone(activeSubscriptionQuery.data.status)}>
                       {activeSubscriptionQuery.data.status}
                     </StatusBadge>
                   </div>
-                  <p className="text-sm font-semibold text-slate-600">
-                    {enumLabel(activeSubscriptionQuery.data.plan.planType)} -{' '}
+                  <p className="text-lg font-bold text-teal-700">
                     {formatCurrency(activeSubscriptionQuery.data.plan.price, activeSubscriptionQuery.data.plan.currency)}
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-slate-600">
-                    Inicio {formatDate(activeSubscriptionQuery.data.startedAt)} - Fin{' '}
-                    {formatDate(activeSubscriptionQuery.data.currentPeriodEnd)}
+                    <span className="ml-1 text-sm font-semibold text-slate-500">
+                      / {enumLabel(activeSubscriptionQuery.data.plan.billingCycle ?? activeSubscriptionQuery.data.plan.planType)}
+                    </span>
                   </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-1 flex items-center gap-1.5 text-slate-500">
+                      <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span className="text-xs font-semibold uppercase tracking-wide">Inicio</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">{formatDate(activeSubscriptionQuery.data.startedAt)}</p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <div className="mb-1 flex items-center gap-1.5 text-slate-500">
+                      <CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />
+                      <span className="text-xs font-semibold uppercase tracking-wide">Vencimiento</span>
+                    </div>
+                    <p className="text-sm font-bold text-slate-800">{formatDate(activeSubscriptionQuery.data.currentPeriodEnd)}</p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 border-t border-slate-200 pt-3">
                   <Button
                     isLoading={cancelSubscriptionMutation.isPending}
                     onClick={() =>
                       runAction(() => cancelSubscriptionMutation.mutateAsync(activeSubscriptionQuery.data.id))
                     }
                     variant="danger"
+                    size="sm"
                   >
-                    Cancelar
+                    Cancelar suscripcion
                   </Button>
                   <Button
                     isLoading={renewSubscriptionMutation.isPending}
                     onClick={() => runAction(() => renewSubscriptionMutation.mutateAsync(activeSubscriptionQuery.data.id))}
                     variant="secondary"
+                    size="sm"
                   >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                    <RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />
                     Renovar
                   </Button>
                 </div>
@@ -311,7 +316,7 @@ export function SubscriptionsPage() {
                 <tbody>
                   {subscriptionsQuery.data.map((subscription) => (
                     <tr key={subscription.id}>
-                      <td>{subscription.id}</td>
+                        <td className="font-mono text-xs text-slate-500">#{subscription.id}</td>
                       <td>{subscription.plan.displayName}</td>
                       <td>
                         <StatusBadge tone={statusTone(subscription.status)}>{subscription.status}</StatusBadge>
@@ -343,7 +348,7 @@ export function SubscriptionsPage() {
                 <tbody>
                   {invoicesQuery.data.map((invoice) => (
                     <tr key={invoice.id}>
-                      <td>{invoice.id}</td>
+                        <td className="font-mono text-xs text-slate-500">#{invoice.id}</td>
                       <td>{formatCurrency(invoice.amount, invoice.currency)}</td>
                       <td>
                         <StatusBadge tone={statusTone(invoice.status)}>{invoice.status}</StatusBadge>
@@ -360,5 +365,77 @@ export function SubscriptionsPage() {
         </Panel>
       </div>
     </>
+  )
+}
+
+function PlanSelector({ form }: { form: UseFormReturn<SubscriptionForm> }) {
+  const selected = useWatch({ control: form.control, name: 'planType' })
+  const plans: { value: SubscriptionForm['planType']; icon: typeof ShieldCheck; label: string; description: string; premium: boolean }[] = [
+    { value: 'INSTITUTION_BASIC', icon: ShieldCheck, label: 'Basic', description: 'Funcionalidades esenciales', premium: false },
+    { value: 'INSTITUTION_PREMIUM', icon: Star, label: 'Premium', description: 'Acceso completo y avanzado', premium: true },
+  ]
+  return (
+    <div>
+      <p className="field-label mb-1.5">Plan</p>
+      <div className="grid grid-cols-2 gap-2">
+        {plans.map(({ value, icon: Icon, label, description, premium }) => {
+          const active = selected === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => form.setValue('planType', value, { shouldValidate: true })}
+              className={[
+                'rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2',
+                active && premium
+                  ? 'border-teal-500 bg-teal-50 ring-1 ring-teal-400'
+                  : active
+                  ? 'border-slate-400 bg-slate-100 ring-1 ring-slate-300'
+                  : 'border-slate-200 bg-white hover:bg-slate-50',
+              ].join(' ')}
+            >
+              <div className="mb-1 flex items-center gap-1.5">
+                <Icon className={`h-4 w-4 ${active && premium ? 'text-teal-700' : 'text-slate-500'}`} aria-hidden="true" />
+                <span className={`text-xs font-bold ${active && premium ? 'text-teal-800' : 'text-slate-700'}`}>{label}</span>
+                {active ? <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-teal-600" aria-hidden="true" /> : null}
+              </div>
+              <p className={`text-xs ${active && premium ? 'text-teal-700' : 'text-slate-500'}`}>{description}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function BillingCycleSelector({ form }: { form: UseFormReturn<SubscriptionForm> }) {
+  const selected = useWatch({ control: form.control, name: 'billingCycle' })
+  const cycles: { value: SubscriptionForm['billingCycle']; label: string; sub: string }[] = [
+    { value: 'MONTHLY', label: 'Mensual', sub: 'Pago mes a mes' },
+    { value: 'ANNUALLY', label: 'Anual', sub: 'Ahorra hasta 20%' },
+  ]
+  return (
+    <div>
+      <p className="field-label mb-1.5">Ciclo de facturacion</p>
+      <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
+        {cycles.map(({ value, label, sub }) => {
+          const active = selected === value
+          return (
+            <button
+              key={value}
+              type="button"
+              onClick={() => form.setValue('billingCycle', value, { shouldValidate: true })}
+              className={[
+                'flex-1 rounded-md px-3 py-2 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600',
+                active ? 'border border-slate-200 bg-white shadow-sm' : 'hover:bg-white/60',
+              ].join(' ')}
+            >
+              <p className={`text-sm font-bold ${active ? 'text-slate-900' : 'text-slate-500'}`}>{label}</p>
+              <p className={`text-xs ${active ? 'font-semibold text-teal-700' : 'text-slate-400'}`}>{sub}</p>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

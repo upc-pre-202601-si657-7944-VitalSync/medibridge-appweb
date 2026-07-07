@@ -31,7 +31,7 @@ const primaryNav = [
 ]
 
 const patientNav = [
-  { icon: ClipboardPlus, label: 'Vista 360', suffix: '' },
+  { icon: ClipboardPlus, label: 'Vista 360', suffix: '', end: true },
   { icon: UsersRound, label: 'Equipo', suffix: '/care-team' },
   { icon: CalendarDays, label: 'Citas', suffix: '/appointments' },
   { icon: Pill, label: 'Medicacion', suffix: '/medications' },
@@ -41,16 +41,19 @@ const patientNav = [
 ]
 
 function SidebarLink({
+  end,
   icon: Icon,
   label,
   to,
 }: {
+  end?: boolean
   icon: typeof LayoutDashboard
   label: string
   to: string
 }) {
   return (
     <NavLink
+      end={end}
       className={({ isActive }) =>
         [
           'flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition',
@@ -114,6 +117,7 @@ export function AppLayout() {
               {patientNav.map((item) => (
                 <SidebarLink
                   key={item.suffix}
+                  end={item.end}
                   icon={item.icon}
                   label={item.label}
                   to={`/patients/${activePatient.id}${item.suffix}`}

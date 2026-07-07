@@ -1,36 +1,22 @@
-import { zodResolver } from '@hookform/resolvers/zod'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
-import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search, UserRoundPlus } from 'lucide-react'
-import { z } from 'zod'
-import { getApiErrorMessage } from '@/shared/api/httpClient'
+import { useDebounce } from '@/shared/utils/useDebounce'
 import { profilesApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
 import { EmptyState } from '@/shared/components/EmptyState'
-import { FormError } from '@/shared/components/FormError'
 import { TextField } from '@/shared/components/FormControls'
 import { LoadingBlock } from '@/shared/components/LoadingBlock'
 import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { saveActivePatient } from '@/shared/utils/clinicalWorkspace'
 
-const loadPatientSchema = z.object({
-  patientId: z.coerce.number().int().positive('Numero requerido'),
-})
-
-type LoadPatientFormInput = z.input<typeof loadPatientSchema>
-type LoadPatientForm = z.output<typeof loadPatientSchema>
-
 export function PatientsPage() {
   const navigate = useNavigate()
-  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
-  const form = useForm<LoadPatientFormInput, unknown, LoadPatientForm>({
-    resolver: zodResolver(loadPatientSchema),
-    defaultValues: { patientId: 0 },
-  })
+  const [codeInput, setCodeInput] = useState('')
+  const debouncedCode = useDebounce(codeInput, 500)
 
   const patientsQuery = useQuery({
     queryFn: profilesApi.listMyPatients,
@@ -45,29 +31,20 @@ export function PatientsPage() {
     return patients.filter((patient) => patient.fullName.toLowerCase().includes(normalizedSearch))
   }, [patientsQuery.data, searchTerm])
 
-  const loadPatientMutation = useMutation({
-    mutationFn: profilesApi.getPatient,
-    onSuccess: (patient) => {
-      saveActivePatient(patient)
-      navigate(`/patients/${patient.id}`)
-    },
+  const parsedCode = Number(debouncedCode)
+  const validCode = Number.isInteger(parsedCode) && parsedCode > 0
+
+  const patientByCodeQuery = useQuery({
+    enabled: validCode,
+    queryFn: () => profilesApi.getPatient(parsedCode),
+    queryKey: ['patient-lookup', parsedCode],
+    retry: false,
   })
 
   function openPatient(patientId: number) {
-    const patient = patientsQuery.data?.find((item) => item.id === patientId)
-    if (patient) {
-      saveActivePatient(patient)
-    }
+    const patient = patientsQuery.data?.find((item) => item.id === patientId) ?? patientByCodeQuery.data
+    if (patient) saveActivePatient(patient)
     navigate(`/patients/${patientId}`)
-  }
-
-  async function loadPatient(values: LoadPatientForm) {
-    setError(null)
-    try {
-      await loadPatientMutation.mutateAsync(values.patientId)
-    } catch (submitError) {
-      setError(getApiErrorMessage(submitError))
-    }
   }
 
   return (
@@ -85,7 +62,6 @@ export function PatientsPage() {
         eyebrow="Profiles"
         title="Pacientes"
       />
-      <FormError message={error} />
 
       <div className="grid grid-cols-[1fr_340px] gap-6">
         <Panel>
@@ -138,19 +114,35 @@ export function PatientsPage() {
 
         <Panel>
           <PanelHeader eyebrow="Acceso rapido" title="Abrir por codigo" />
-          <PanelBody>
-            <form className="space-y-4" onSubmit={form.handleSubmit(loadPatient)}>
-              <TextField
-                error={form.formState.errors.patientId?.message}
-                label="Codigo de paciente"
-                type="number"
-                {...form.register('patientId')}
-              />
-              <Button className="w-full" isLoading={loadPatientMutation.isPending} type="submit" variant="secondary">
-                <Search className="h-4 w-4" aria-hidden="true" />
-                Abrir
-              </Button>
-            </form>
+          <PanelBody className="space-y-4">
+            <TextField
+              label="Codigo de paciente"
+              onChange={(e) => setCodeInput(e.target.value)}
+              type="number"
+              value={codeInput}
+            />
+            {codeInput && !validCode ? (
+              <p className="text-xs font-semibold text-rose-600">Ingresa un numero valido</p>
+            ) : patientByCodeQuery.isFetching ? (
+              <LoadingBlock />
+            ) : patientByCodeQuery.data ? (
+              <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Paciente encontrado</p>
+                <p className="mt-1 font-bold text-slate-900">{patientByCodeQuery.data.fullName}</p>
+                <p className="mt-0.5 text-xs font-semibold text-slate-500">Codigo #{patientByCodeQuery.data.id}</p>
+                <Button
+                  className="mt-3 w-full"
+                  onClick={() => openPatient(patientByCodeQuery.data.id)}
+                  size="sm"
+                  variant="secondary"
+                >
+                  <Search className="h-3.5 w-3.5" aria-hidden="true" />
+                  Abrir paciente
+                </Button>
+              </div>
+            ) : patientByCodeQuery.isError ? (
+              <p className="text-xs font-semibold text-rose-600">No se encontro un paciente con ese codigo</p>
+            ) : null}
           </PanelBody>
         </Panel>
       </div>
