@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Activity, CalendarDays, FileText, HeartPulse, Pill } from 'lucide-react'
-import { appointmentsApi, healthApi, medicationApi, paymentsApi, reportsApi } from '@/shared/api/medibridgeApi'
+import { appointmentsApi, healthApi, medicationApi, paymentsApi, profilesApi, reportsApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
 import { EmptyState } from '@/shared/components/EmptyState'
 import { LoadingBlock } from '@/shared/components/LoadingBlock'
@@ -54,11 +54,24 @@ export function DashboardPage() {
     queryKey: ['active-subscription', user?.id],
     retry: false,
   })
+  const myPatientsQuery = useQuery({
+    queryFn: profilesApi.listMyPatients,
+    queryKey: ['my-patients'],
+    retry: false,
+  })
+
   const appointmentsQuery = useQuery({
     enabled: Boolean(patientId),
     queryFn: () => appointmentsApi.listPatientAppointments(patientId!),
     queryKey: ['appointments', patientId],
   })
+
+  function getPatientName(apptPatientId: number) {
+    const found = myPatientsQuery.data?.find((p) => p.id === apptPatientId)
+    if (found) return found.fullName
+    if (workspace.activePatient?.id === apptPatientId) return workspace.activePatient.fullName
+    return null
+  }
   const medicationsQuery = useQuery({
     enabled: Boolean(patientId),
     queryFn: () => medicationApi.listPatientMedications(patientId!),
@@ -137,6 +150,7 @@ export function DashboardPage() {
               <table className="clinical-table">
                 <thead>
                   <tr>
+                    <th>Paciente</th>
                     <th>Inicio</th>
                     <th>Estado</th>
                     <th>Motivo</th>
@@ -145,6 +159,11 @@ export function DashboardPage() {
                 <tbody>
                   {appointmentsQuery.data.slice(0, 6).map((appointment) => (
                     <tr key={appointment.id}>
+                      <td className="font-semibold">
+                        {getPatientName(appointment.patientId) ?? (
+                          <span className="text-slate-400">#{appointment.patientId}</span>
+                        )}
+                      </td>
                       <td>{formatDateTime(appointment.startsAt)}</td>
                       <td>
                         <StatusBadge tone={statusTone(appointment.status)}>
