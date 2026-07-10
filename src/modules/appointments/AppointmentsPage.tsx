@@ -17,6 +17,7 @@ import { StatusBadge } from '@/shared/components/StatusBadge'
 import { ensureLocalDateTimeSeconds, formatDateTime, nowDateTimeInput } from '@/shared/utils/format'
 import { getClinicalWorkspace } from '@/shared/utils/clinicalWorkspace'
 import { enumLabel, statusTone } from '@/shared/utils/labels'
+import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 
 const appointmentSchema = z.object({
@@ -29,7 +30,7 @@ type AppointmentFormInput = z.input<typeof appointmentSchema>
 type AppointmentForm = z.output<typeof appointmentSchema>
 
 export function AppointmentsPage() {
-  const { patient, patientId, patientQuery } = usePatientRoute()
+  const { accessError, patient, patientId, patientQuery, routePatientId } = usePatientRoute()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const workspace = getClinicalWorkspace()
@@ -83,6 +84,7 @@ export function AppointmentsPage() {
   }
 
   if (patientQuery.isLoading) return <LoadingBlock />
+  if (accessError) return <PatientAccessState message={accessError} patientId={routePatientId} />
 
   return (
     <>

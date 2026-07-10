@@ -27,6 +27,7 @@ import { LoadingBlock } from '@/shared/components/LoadingBlock'
 import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { StatusBadge } from '@/shared/components/StatusBadge'
+import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { saveActivePatient } from '@/shared/utils/clinicalWorkspace'
 import { ensureLocalDateTimeSeconds, formatDate, nowDateTimeInput, todayDateInput } from '@/shared/utils/format'
 import { enumLabel } from '@/shared/utils/labels'
@@ -139,6 +140,7 @@ function upsertById<T extends { id: number }>(items: T[], item?: T | null) {
 
 export function MedicationPage() {
   const params = useParams()
+  const isPatientRoute = params.patientId !== undefined
   const routePatientId = Number(params.patientId)
   const hasRoutePatient = Number.isFinite(routePatientId) && routePatientId > 0
   const queryClient = useQueryClient()
@@ -174,34 +176,38 @@ export function MedicationPage() {
     queryKey: ['my-patients'],
     retry: false,
   })
-  const routePatientQuery = useQuery({
-    enabled: hasRoutePatient,
-    queryFn: () => profilesApi.getPatient(routePatientId),
-    queryKey: ['patient', routePatientId],
-    retry: false,
-  })
 
-  const patients = useMemo(() => {
-    const map = new Map<number, PatientProfile>()
-    patientsQuery.data?.forEach((patient) => map.set(patient.id, patient))
-    if (routePatientQuery.data) map.set(routePatientQuery.data.id, routePatientQuery.data)
-    return [...map.values()].sort((left, right) => left.fullName.localeCompare(right.fullName))
-  }, [patientsQuery.data, routePatientQuery.data])
+  const patients = useMemo(
+    () => [...(patientsQuery.data ?? [])].sort((left, right) => left.fullName.localeCompare(right.fullName)),
+    [patientsQuery.data],
+  )
+  const routePatient = hasRoutePatient
+    ? patients.find((patient) => patient.id === routePatientId)
+    : undefined
+  const scopedPatients = useMemo(
+    () => (isPatientRoute ? (routePatient ? [routePatient] : []) : patients),
+    [isPatientRoute, patients, routePatient],
+  )
 
   useEffect(() => {
-    if (hasRoutePatient) {
-      setSelectedPatientId(routePatientId)
+    if (isPatientRoute) {
+      setSelectedPatientId(hasRoutePatient ? routePatientId : null)
       return
     }
-    if (!selectedPatientId && patients.length) {
+    if (!patients.length) {
+      if (selectedPatientId) setSelectedPatientId(null)
+      return
+    }
+    if (!selectedPatientId || !patients.some((patient) => patient.id === selectedPatientId)) {
       setSelectedPatientId(patients[0].id)
     }
-  }, [hasRoutePatient, patients, routePatientId, selectedPatientId])
+  }, [hasRoutePatient, isPatientRoute, patients, routePatientId, selectedPatientId])
+
+  const selectedPatient = scopedPatients.find((patient) => patient.id === selectedPatientId)
 
   useEffect(() => {
-    const selectedPatient = patients.find((patient) => patient.id === selectedPatientId)
     if (selectedPatient) saveActivePatient(selectedPatient)
-  }, [patients, selectedPatientId])
+  }, [selectedPatient])
 
   useEffect(() => {
     setActiveStep('medication')
@@ -217,38 +223,38 @@ export function MedicationPage() {
   }, [doseForm, medicationForm, scheduleForm, selectedPatientId])
 
   const medicationQueries = useQueries({
-    queries: patients.map((patient) => ({
+    queries: scopedPatients.map((patient) => ({
       enabled: Boolean(patient.id),
       queryFn: () => medicationApi.listPatientMedications(patient.id),
       queryKey: ['medications', patient.id],
     })),
   })
   const scheduleQueries = useQueries({
-    queries: patients.map((patient) => ({
+    queries: scopedPatients.map((patient) => ({
       enabled: Boolean(patient.id),
       queryFn: () => medicationApi.listActiveSchedules(patient.id),
       queryKey: ['medication-schedules', patient.id],
     })),
   })
   const lowStockQuery = useQuery({
-    enabled: Boolean(selectedPatientId),
-    queryFn: () => medicationApi.listLowStock(selectedPatientId!),
-    queryKey: ['low-stock', selectedPatientId],
+    enabled: Boolean(selectedPatient),
+    queryFn: () => medicationApi.listLowStock(selectedPatient!.id),
+    queryKey: ['low-stock', selectedPatient?.id],
+    retry: false,
   })
 
   const allMedications = useMemo<MedicationWithPatient[]>(() => {
-    return patients.flatMap((patient, index) =>
+    return scopedPatients.flatMap((patient, index) =>
       (medicationQueries[index]?.data ?? [])
         .filter((medication) => medication.active)
         .map((medication) => ({ medication, patient })),
     )
-  }, [medicationQueries, patients])
+  }, [medicationQueries, scopedPatients])
 
   const allSchedules = useMemo<MedicationSchedule[]>(() => {
     return scheduleQueries.flatMap((query) => query.data ?? [])
   }, [scheduleQueries])
 
-  const selectedPatient = patients.find((patient) => patient.id === selectedPatientId)
   const selectedPatientMedications = allMedications
     .filter((item) => item.patient.id === selectedPatientId)
     .map((item) => item.medication)
@@ -261,14 +267,14 @@ export function MedicationPage() {
   const scheduleCards = allSchedules
     .map<ScheduleWithContext | null>((schedule) => {
       const item = allMedications.find(({ medication }) => medication.id === schedule.medicationId)
-      const patient = patients.find((value) => value.id === schedule.patientId)
+      const patient = scopedPatients.find((value) => value.id === schedule.patientId)
       if (!item || !patient) return null
       return { medication: item.medication, patient, schedule }
     })
     .filter((value): value is ScheduleWithContext => Boolean(value))
   const doseActionTarget = scheduleCards.find((item) => item.schedule.id === doseActionScheduleId) ?? null
 
-  const patientOptions = patients.map((patient) => ({
+  const patientOptions = (isPatientRoute ? scopedPatients : patients).map((patient) => ({
     label: patient.fullName,
     value: patient.id,
   }))
@@ -282,6 +288,21 @@ export function MedicationPage() {
   const lowStockCount = allMedications.filter(
     ({ medication }) => medication.stockQuantity <= medication.lowStockThreshold,
   ).length
+  const patientsLoadError = patientsQuery.isError
+    ? `No se pudo cargar tu equipo de cuidado. ${getApiErrorMessage(patientsQuery.error)}`
+    : null
+  const medicationLoadErrorValue = medicationQueries.find((query) => query.isError)?.error
+  const medicationLoadError = medicationLoadErrorValue
+    ? `No se pudieron cargar los medicamentos. ${getApiErrorMessage(medicationLoadErrorValue)}`
+    : null
+  const scheduleLoadErrorValue = scheduleQueries.find((query) => query.isError)?.error
+  const scheduleLoadError = scheduleLoadErrorValue
+    ? `No se pudieron cargar los tratamientos. ${getApiErrorMessage(scheduleLoadErrorValue)}`
+    : null
+  const lowStockLoadError = lowStockQuery.isError
+    ? `No se pudieron cargar las alertas de stock. ${getApiErrorMessage(lowStockQuery.error)}`
+    : null
+  const dataLoadError = patientsLoadError ?? medicationLoadError ?? scheduleLoadError ?? lowStockLoadError
   const canOpenTreatment = Boolean(selectedMedication)
 
   useEffect(() => {
@@ -464,13 +485,29 @@ export function MedicationPage() {
     chooseMedication(0)
   }
 
+  if (patientsQuery.isLoading) return <LoadingBlock />
+  if (isPatientRoute && !hasRoutePatient) {
+    return <PatientAccessState message="El codigo de paciente de la ruta no es valido." />
+  }
+  if (isPatientRoute && patientsQuery.isError) {
+    return <PatientAccessState message={patientsLoadError ?? 'No se pudo verificar el acceso al paciente.'} patientId={routePatientId} />
+  }
+  if (isPatientRoute && patientsQuery.isSuccess && !routePatient) {
+    return (
+      <PatientAccessState
+        message="Este paciente no pertenece a tu equipo de cuidado. Vinculate antes de gestionar su medicacion."
+        patientId={routePatientId}
+      />
+    )
+  }
+
   return (
     <>
       <PageHeader
-        eyebrow={selectedPatient ? 'Paciente activo' : 'Medicacion'}
-        title={selectedPatient ? `Medicacion - ${selectedPatient.fullName}` : 'Medicacion'}
+        eyebrow={isPatientRoute ? 'Paciente activo' : 'Gestion clinica'}
+        title={isPatientRoute && selectedPatient ? `Medicacion - ${selectedPatient.fullName}` : 'Centro de medicacion'}
       />
-      <FormError message={error} />
+      <FormError message={error || dataLoadError} />
       {setupMessage ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
           {setupMessage}
@@ -528,7 +565,7 @@ export function MedicationPage() {
               </div>
 
               <SelectField
-                disabled={hasRoutePatient}
+                disabled={isPatientRoute}
                 label="Paciente"
                 onChange={(event) => setSelectedPatientId(Number(event.target.value) || null)}
                 options={[{ label: 'Seleccione', value: 0 }, ...patientOptions]}
@@ -837,7 +874,9 @@ export function MedicationPage() {
                 </div>
               </div>
 
-              {schedulesLoading ? (
+              {scheduleLoadError && !scheduleCards.length ? (
+                <FormError message={scheduleLoadError} />
+              ) : schedulesLoading ? (
                 <LoadingBlock />
               ) : scheduleCards.length ? (
                 <div className="grid grid-cols-2 gap-3">
@@ -895,7 +934,9 @@ export function MedicationPage() {
           <Panel>
             <PanelHeader eyebrow="Inventario" title="Medicamentos activos" />
             <PanelBody>
-              {dashboardLoading ? (
+              {medicationLoadError && !allMedications.length ? (
+                <FormError message={medicationLoadError} />
+              ) : dashboardLoading ? (
                 <LoadingBlock />
               ) : allMedications.length ? (
                 <div className="grid grid-cols-3 gap-3">
@@ -1019,7 +1060,9 @@ export function MedicationPage() {
             <Panel>
               <PanelHeader eyebrow="Paciente seleccionado" title="Tratamientos" />
               <PanelBody>
-                {selectedPatientSchedules.length ? (
+                {scheduleLoadError && !selectedPatientSchedules.length ? (
+                  <FormError message={scheduleLoadError} />
+                ) : selectedPatientSchedules.length ? (
                   <div className="space-y-2">
                     {selectedPatientSchedules.map((schedule) => {
                       const medication = flowMedications.find((item) => item.id === schedule.medicationId)
@@ -1050,7 +1093,11 @@ export function MedicationPage() {
             <Panel>
               <PanelHeader eyebrow="Alertas" title="Stock bajo" />
               <PanelBody>
-                {lowStockQuery.data?.length ? (
+                {lowStockLoadError ? (
+                  <FormError message={lowStockLoadError} />
+                ) : lowStockQuery.isLoading ? (
+                  <LoadingBlock />
+                ) : lowStockQuery.data?.length ? (
                   <div className="space-y-2">
                     {lowStockQuery.data.map((alert) => (
                       <div

@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
@@ -19,12 +20,13 @@ import {
 import { Button } from '@/shared/components/Button'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { useAuth } from '@/modules/auth/useAuth'
-import { getClinicalWorkspace } from '@/shared/utils/clinicalWorkspace'
+import { profilesApi } from '@/shared/api/medibridgeApi'
+import { clearActivePatient, getClinicalWorkspace } from '@/shared/utils/clinicalWorkspace'
 
 const primaryNav = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
   { icon: UsersRound, label: 'Pacientes', to: '/patients' },
-  { icon: Pill, label: 'Medicacion', to: '/medications' },
+  { icon: Pill, label: 'Centro de medicación', to: '/medications' },
   { icon: CreditCard, label: 'Suscripcion', to: '/subscriptions' },
   { icon: MessageSquareText, label: 'Chat', to: '/chat' },
   { icon: Bell, label: 'Notificaciones', to: '/notifications' },
@@ -34,7 +36,7 @@ const patientNav = [
   { icon: ClipboardPlus, label: 'Vista 360', suffix: '', end: true },
   { icon: UsersRound, label: 'Equipo', suffix: '/care-team' },
   { icon: CalendarDays, label: 'Citas', suffix: '/appointments' },
-  { icon: Pill, label: 'Medicacion', suffix: '/medications' },
+  { icon: Pill, label: 'Medicación', suffix: '/medications' },
   { icon: HeartPulse, label: 'Salud', suffix: '/health' },
   { icon: FileText, label: 'Reportes', suffix: '/reports' },
   { icon: ChartNoAxesCombined, label: 'Analitica', suffix: '/analytics' },
@@ -72,6 +74,12 @@ export function AppLayout() {
   const { pathname } = useLocation()
   const { signOut, user } = useAuth()
   const [workspace, setWorkspace] = useState(() => getClinicalWorkspace(user?.id))
+  const patientsQuery = useQuery({
+    enabled: Boolean(user?.id),
+    queryFn: profilesApi.listMyPatients,
+    queryKey: ['my-patients', user?.id, 'workspace-validation'],
+    retry: false,
+  })
 
   useEffect(() => {
     function refreshWorkspace() {
@@ -85,6 +93,13 @@ export function AppLayout() {
       window.removeEventListener('storage', refreshWorkspace)
     }
   }, [user?.id])
+
+  useEffect(() => {
+    const activePatient = workspace.activePatient
+    if (!activePatient || !patientsQuery.isSuccess || patientsQuery.isFetching) return
+    const stillAssigned = patientsQuery.data.some((patient) => patient.id === activePatient.id)
+    if (!stillAssigned) clearActivePatient(user?.id)
+  }, [patientsQuery.data, patientsQuery.isFetching, patientsQuery.isSuccess, user?.id, workspace.activePatient])
 
   const activePatient = workspace.activePatient
 

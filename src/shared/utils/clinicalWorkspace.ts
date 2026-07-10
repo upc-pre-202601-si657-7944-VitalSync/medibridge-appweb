@@ -73,6 +73,16 @@ export function saveActivePatient(patient: PatientProfile) {
   })
 }
 
+export function clearActivePatient(userId?: number) {
+  const workspace = getClinicalWorkspace(userId)
+  if (!workspace.activePatient) return
+
+  saveWorkspace({
+    ...workspace,
+    activePatient: undefined,
+  })
+}
+
 export function clearClinicalWorkspace() {
   localStorage.removeItem(workspaceKey)
   window.dispatchEvent(new Event('medibridge:workspace-updated'))

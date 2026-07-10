@@ -25,6 +25,7 @@ import type {
   MedicationSchedule,
   Notification,
   PatientProfile,
+  ProfileChatContact,
   RecordDoseAdministrationRequest,
   RecordHealthObservationRequest,
   RegisterMedicationRequest,
@@ -84,6 +85,13 @@ export const profilesApi = {
     const { data } = await httpClient.post<PatientProfile>('/api/v1/profiles/patients', payload)
     return data
   },
+  async createAssignedPatient(payload: { fullName: string }) {
+    const { data } = await httpClient.post<PatientProfile>(
+      '/api/v1/profiles/patients/assigned-to-me',
+      payload,
+    )
+    return data
+  },
   async getPatient(patientId: number) {
     const { data } = await httpClient.get<PatientProfile>(
       `/api/v1/profiles/patients/${patientId}`,
@@ -92,6 +100,10 @@ export const profilesApi = {
   },
   async listMyPatients() {
     const { data } = await httpClient.get<PatientProfile[]>('/api/v1/profiles/patients/my-care-team')
+    return data
+  },
+  async listChatContacts() {
+    const { data } = await httpClient.get<ProfileChatContact[]>('/api/v1/profiles/chat-contacts')
     return data
   },
   async assignDoctor(patientId: number, doctorProfileId: number) {

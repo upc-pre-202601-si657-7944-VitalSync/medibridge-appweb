@@ -34,6 +34,10 @@ const subscriptionSchema = z.object({
 type DoctorForm = z.infer<typeof doctorSchema>
 type SubscriptionForm = z.infer<typeof subscriptionSchema>
 
+function getCheckoutReturnUrl() {
+  return window.location.origin
+}
+
 export function OnboardingDoctorPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
@@ -105,6 +109,7 @@ export function OnboardingDoctorPage() {
         billingCycle: values.billingCycle,
         commercialLine: 'INSTITUTION',
         planType: values.planType,
+        returnUrl: getCheckoutReturnUrl(),
         userId: user.id,
       })
     } catch (submitError) {

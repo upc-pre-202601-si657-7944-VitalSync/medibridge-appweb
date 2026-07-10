@@ -9,10 +9,11 @@ import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { formatDate, formatDateTime } from '@/shared/utils/format'
 import { enumLabel, statusTone } from '@/shared/utils/labels'
+import { PatientAccessState } from './PatientAccessState'
 import { usePatientRoute } from './usePatientRoute'
 
 export function PatientOverviewPage() {
-  const { patient, patientId, patientQuery } = usePatientRoute()
+  const { accessError, patient, patientId, patientQuery, routePatientId } = usePatientRoute()
 
   const appointmentsQuery = useQuery({
     enabled: Boolean(patientId),
@@ -43,6 +44,7 @@ export function PatientOverviewPage() {
   })
 
   if (patientQuery.isLoading) return <LoadingBlock />
+  if (accessError) return <PatientAccessState message={accessError} patientId={routePatientId} />
 
   return (
     <>

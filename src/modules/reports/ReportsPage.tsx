@@ -15,6 +15,7 @@ import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { formatDate, formatDateTime, todayDateInput } from '@/shared/utils/format'
 import { enumLabel } from '@/shared/utils/labels'
+import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 
 const reportSchema = z
@@ -31,7 +32,7 @@ const reportSchema = z
 type ReportForm = z.infer<typeof reportSchema>
 
 export function ReportsPage() {
-  const { patient, patientId, patientQuery } = usePatientRoute()
+  const { accessError, patient, patientId, patientQuery, routePatientId } = usePatientRoute()
   const queryClient = useQueryClient()
   const [error, setError] = useState<string | null>(null)
   const form = useForm<ReportForm>({
@@ -98,6 +99,7 @@ export function ReportsPage() {
   }
 
   if (patientQuery.isLoading) return <LoadingBlock />
+  if (accessError) return <PatientAccessState message={accessError} patientId={routePatientId} />
 
   return (
     <>

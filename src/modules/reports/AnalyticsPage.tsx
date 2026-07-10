@@ -8,6 +8,7 @@ import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { formatDateTime } from '@/shared/utils/format'
 import { enumLabel } from '@/shared/utils/labels'
+import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 
 const trendTone = {
@@ -17,7 +18,7 @@ const trendTone = {
 } as const
 
 export function AnalyticsPage() {
-  const { patient, patientId, patientQuery } = usePatientRoute()
+  const { accessError, patient, patientId, patientQuery, routePatientId } = usePatientRoute()
   const dashboardQuery = useQuery({
     enabled: Boolean(patientId),
     queryFn: () => reportsApi.getDashboard(patientId),
@@ -26,6 +27,7 @@ export function AnalyticsPage() {
   })
 
   if (patientQuery.isLoading) return <LoadingBlock />
+  if (accessError) return <PatientAccessState message={accessError} patientId={routePatientId} />
 
   const chartData =
     dashboardQuery.data?.metricSnapshots.map((snapshot) => ({

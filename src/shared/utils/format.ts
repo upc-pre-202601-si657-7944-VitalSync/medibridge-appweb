@@ -1,19 +1,25 @@
+const peruLocale = 'es-PE'
+const peruTimeZone = 'America/Lima'
+
 export function formatDateTime(value?: string | null) {
   if (!value) return '-'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('es-CO', {
+  return new Intl.DateTimeFormat(peruLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: peruTimeZone,
   }).format(date)
 }
 
 export function formatDate(value?: string | null) {
   if (!value) return '-'
-  const date = new Date(`${value}T00:00:00`)
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value)
+  const date = new Date(isDateOnly ? `${value}T00:00:00Z` : value)
   if (Number.isNaN(date.getTime())) return value
-  return new Intl.DateTimeFormat('es-CO', {
+  return new Intl.DateTimeFormat(peruLocale, {
     dateStyle: 'medium',
+    timeZone: isDateOnly ? 'UTC' : peruTimeZone,
   }).format(date)
 }
 
@@ -21,7 +27,7 @@ export function formatCurrency(value?: number | string | null, currency = 'USD')
   if (value === null || value === undefined || value === '') return '-'
   const numericValue = Number(value)
   if (Number.isNaN(numericValue)) return String(value)
-  return new Intl.NumberFormat('es-CO', {
+  return new Intl.NumberFormat(peruLocale, {
     style: 'currency',
     currency,
     maximumFractionDigits: 2,
@@ -34,11 +40,28 @@ export function ensureLocalDateTimeSeconds(value: string) {
 }
 
 export function todayDateInput() {
-  return new Date().toISOString().slice(0, 10)
+  return peruDateTimeParts().date
 }
 
 export function nowDateTimeInput() {
-  const date = new Date()
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
-  return date.toISOString().slice(0, 16)
+  const parts = peruDateTimeParts()
+  return `${parts.date}T${parts.time}`
+}
+
+function peruDateTimeParts() {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    day: '2-digit',
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    month: '2-digit',
+    timeZone: peruTimeZone,
+    year: 'numeric',
+  }).formatToParts(new Date())
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  }
 }

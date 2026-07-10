@@ -3,14 +3,17 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Search, UserRoundPlus } from 'lucide-react'
 import { useDebounce } from '@/shared/utils/useDebounce'
+import { getApiErrorMessage } from '@/shared/api/httpClient'
 import { profilesApi } from '@/shared/api/medibridgeApi'
 import { Button } from '@/shared/components/Button'
 import { EmptyState } from '@/shared/components/EmptyState'
+import { FormError } from '@/shared/components/FormError'
 import { TextField } from '@/shared/components/FormControls'
 import { LoadingBlock } from '@/shared/components/LoadingBlock'
 import { PageHeader } from '@/shared/components/PageHeader'
 import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
 import { saveActivePatient } from '@/shared/utils/clinicalWorkspace'
+import type { PatientProfile } from '@/shared/types/api'
 
 export function PatientsPage() {
   const navigate = useNavigate()
@@ -41,10 +44,16 @@ export function PatientsPage() {
     retry: false,
   })
 
-  function openPatient(patientId: number) {
-    const patient = patientsQuery.data?.find((item) => item.id === patientId) ?? patientByCodeQuery.data
-    if (patient) saveActivePatient(patient)
-    navigate(`/patients/${patientId}`)
+  const patientByCodeIsAssigned = Boolean(
+    patientByCodeQuery.data
+      && patientsQuery.data?.some((patient) => patient.id === patientByCodeQuery.data?.id),
+  )
+
+  function openPatient(patient: PatientProfile) {
+    const assignedPatient = patientsQuery.data?.find((item) => item.id === patient.id)
+    if (!assignedPatient) return
+    saveActivePatient(assignedPatient)
+    navigate(`/patients/${assignedPatient.id}`)
   }
 
   return (
@@ -61,6 +70,9 @@ export function PatientsPage() {
         }
         eyebrow="Profiles"
         title="Pacientes"
+      />
+      <FormError
+        message={patientsQuery.isError ? `No se pudo cargar tu equipo de cuidado. ${getApiErrorMessage(patientsQuery.error)}` : null}
       />
 
       <div className="grid grid-cols-[1fr_340px] gap-6">
@@ -91,7 +103,7 @@ export function PatientsPage() {
                       <td className="font-semibold">{patient.fullName}</td>
                       <td>{patient.id}</td>
                       <td>
-                        <Button onClick={() => openPatient(patient.id)} size="sm" variant="secondary">
+                        <Button onClick={() => openPatient(patient)} size="sm" variant="secondary">
                           Abrir
                         </Button>
                       </td>
@@ -130,14 +142,25 @@ export function PatientsPage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Paciente encontrado</p>
                 <p className="mt-1 font-bold text-slate-900">{patientByCodeQuery.data.fullName}</p>
                 <p className="mt-0.5 text-xs font-semibold text-slate-500">Codigo #{patientByCodeQuery.data.id}</p>
+                {!patientByCodeIsAssigned ? (
+                  <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
+                    Este paciente aun no pertenece a tu equipo de cuidado.
+                  </p>
+                ) : null}
                 <Button
                   className="mt-3 w-full"
-                  onClick={() => openPatient(patientByCodeQuery.data.id)}
+                  onClick={() => {
+                    if (patientByCodeIsAssigned) {
+                      openPatient(patientByCodeQuery.data)
+                      return
+                    }
+                    navigate(`/patients/${patientByCodeQuery.data.id}/care-team`)
+                  }}
                   size="sm"
                   variant="secondary"
                 >
                   <Search className="h-3.5 w-3.5" aria-hidden="true" />
-                  Abrir paciente
+                  {patientByCodeIsAssigned ? 'Abrir paciente' : 'Vincular paciente'}
                 </Button>
               </div>
             ) : patientByCodeQuery.isError ? (

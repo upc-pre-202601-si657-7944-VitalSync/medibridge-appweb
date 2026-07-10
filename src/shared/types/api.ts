@@ -36,7 +36,17 @@ export type DoctorProfile = {
 
 export type PatientProfile = {
   id: number
+  userId?: number | null
   fullName: string
+}
+
+export type ProfileChatContact = {
+  userId: number
+  fullName: string
+  contactType: 'DOCTOR' | 'FAMILY_MEMBER'
+  profileId: number
+  patientId: number
+  patientFullName: string
 }
 
 export type FamilyMemberProfile = {
@@ -96,7 +106,9 @@ export type CreateSubscriptionRequest = {
   billingCycle: BillingCycle
 }
 
-export type CreateCheckoutSessionRequest = CreateSubscriptionRequest
+export type CreateCheckoutSessionRequest = CreateSubscriptionRequest & {
+  returnUrl?: string
+}
 
 export type CheckoutSessionResponse = {
   checkoutUrl: string

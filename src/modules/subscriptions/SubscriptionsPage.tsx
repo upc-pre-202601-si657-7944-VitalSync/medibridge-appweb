@@ -27,6 +27,10 @@ const subscriptionSchema = z.object({
 
 type SubscriptionForm = z.infer<typeof subscriptionSchema>
 
+function getCheckoutReturnUrl() {
+  return window.location.origin
+}
+
 export function SubscriptionsPage() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
@@ -151,6 +155,7 @@ export function SubscriptionsPage() {
         billingCycle: values.billingCycle,
         commercialLine: 'INSTITUTION',
         planType: values.planType,
+        returnUrl: getCheckoutReturnUrl(),
         userId: user.id,
       }),
     )
