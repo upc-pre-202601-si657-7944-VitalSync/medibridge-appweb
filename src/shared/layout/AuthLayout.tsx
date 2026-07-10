@@ -32,7 +32,7 @@ export function AuthLayout() {
           </div>
         </div>
 
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">http://localhost:8080</p>
+        <div aria-hidden="true" />
       </section>
       <section className="flex items-center justify-center bg-slate-50 px-12">
         <Outlet />
