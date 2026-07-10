@@ -1,10 +1,9 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useForm } from 'react-hook-form'
 import { useParams } from 'react-router-dom'
 import {
-  AlertTriangle,
   CalendarClock,
   CheckCircle2,
   ClipboardList,
@@ -13,7 +12,7 @@ import {
   Pill,
   Save,
   Syringe,
-  X,
+  Trash2,
   XCircle,
 } from 'lucide-react'
 import { z } from 'zod'
@@ -24,8 +23,8 @@ import { EmptyState } from '@/shared/components/EmptyState'
 import { FormError } from '@/shared/components/FormError'
 import { SelectField, TextareaField, TextField } from '@/shared/components/FormControls'
 import { LoadingBlock } from '@/shared/components/LoadingBlock'
-import { PageHeader } from '@/shared/components/PageHeader'
-import { Panel, PanelBody, PanelHeader } from '@/shared/components/Panel'
+import { Modal } from '@/shared/components/Modal'
+import { Panel, PanelBody } from '@/shared/components/Panel'
 import { StatusBadge } from '@/shared/components/StatusBadge'
 import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { saveActivePatient } from '@/shared/utils/clinicalWorkspace'
@@ -99,6 +98,31 @@ const setupSteps: { id: SetupStep; label: string; number: string }[] = [
   { id: 'treatment', label: 'Tratamiento', number: '02' },
 ]
 
+const blueButtonClass = 'bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-600'
+const blueSecondaryButtonClass = 'focus-visible:ring-blue-600'
+
+function MedicationSectionHeader({
+  action,
+  eyebrow,
+  title,
+}: {
+  action?: ReactNode
+  eyebrow?: string
+  title: string
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
+      <div>
+        {eyebrow ? (
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-blue-600">{eyebrow}</p>
+        ) : null}
+        <h2 className="mt-0.5 text-base font-black text-slate-950">{title}</h2>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  )
+}
+
 function medicationDefaultValues(): MedicationFormInput {
   return {
     administrationRoute: 'ORAL',
@@ -138,6 +162,10 @@ function upsertById<T extends { id: number }>(items: T[], item?: T | null) {
   return [...map.values()]
 }
 
+function formatTreatmentTime(value: string) {
+  return value.slice(0, 5)
+}
+
 export function MedicationPage() {
   const params = useParams()
   const isPatientRoute = params.patientId !== undefined
@@ -145,7 +173,10 @@ export function MedicationPage() {
   const hasRoutePatient = Number.isFinite(routePatientId) && routePatientId > 0
   const queryClient = useQueryClient()
   const [activeStep, setActiveStep] = useState<SetupStep>('medication')
+  const [deleteConfirmationOpen, setDeleteConfirmationOpen] = useState(false)
   const [doseActionScheduleId, setDoseActionScheduleId] = useState<number | null>(null)
+  const [doseError, setDoseError] = useState<string | null>(null)
+  const [editError, setEditError] = useState<string | null>(null)
   const [editingMedicationId, setEditingMedicationId] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [medicationMode, setMedicationMode] = useState<MedicationMode>('existing')
@@ -211,9 +242,13 @@ export function MedicationPage() {
 
   useEffect(() => {
     setActiveStep('medication')
+    setDeleteConfirmationOpen(false)
     setDoseActionScheduleId(null)
+    setDoseError(null)
+    setEditError(null)
     setEditingMedicationId(null)
     setError(null)
+    setMedicationMode('existing')
     setSetupMessage(null)
     setSelectedMedicationId(null)
     setTransientMedication(null)
@@ -236,13 +271,6 @@ export function MedicationPage() {
       queryKey: ['medication-schedules', patient.id],
     })),
   })
-  const lowStockQuery = useQuery({
-    enabled: Boolean(selectedPatient),
-    queryFn: () => medicationApi.listLowStock(selectedPatient!.id),
-    queryKey: ['low-stock', selectedPatient?.id],
-    retry: false,
-  })
-
   const allMedications = useMemo<MedicationWithPatient[]>(() => {
     return scopedPatients.flatMap((patient, index) =>
       (medicationQueries[index]?.data ?? [])
@@ -273,6 +301,9 @@ export function MedicationPage() {
     })
     .filter((value): value is ScheduleWithContext => Boolean(value))
   const doseActionTarget = scheduleCards.find((item) => item.schedule.id === doseActionScheduleId) ?? null
+  const editingMedication =
+    allMedications.find(({ medication }) => medication.id === editingMedicationId)?.medication ??
+    (transientMedication?.id === editingMedicationId ? transientMedication : null)
 
   const patientOptions = (isPatientRoute ? scopedPatients : patients).map((patient) => ({
     label: patient.fullName,
@@ -283,11 +314,9 @@ export function MedicationPage() {
     value: medication.id,
   }))
   const selectedMedicationIds = selectedPatientMedications.map((medication) => medication.id).join(',')
+  const firstSelectedMedicationId = selectedPatientMedications[0]?.id ?? null
   const dashboardLoading = medicationQueries.some((query) => query.isLoading) || patientsQuery.isLoading
   const schedulesLoading = scheduleQueries.some((query) => query.isLoading)
-  const lowStockCount = allMedications.filter(
-    ({ medication }) => medication.stockQuantity <= medication.lowStockThreshold,
-  ).length
   const patientsLoadError = patientsQuery.isError
     ? `No se pudo cargar tu equipo de cuidado. ${getApiErrorMessage(patientsQuery.error)}`
     : null
@@ -299,36 +328,35 @@ export function MedicationPage() {
   const scheduleLoadError = scheduleLoadErrorValue
     ? `No se pudieron cargar los tratamientos. ${getApiErrorMessage(scheduleLoadErrorValue)}`
     : null
-  const lowStockLoadError = lowStockQuery.isError
-    ? `No se pudieron cargar las alertas de stock. ${getApiErrorMessage(lowStockQuery.error)}`
-    : null
-  const dataLoadError = patientsLoadError ?? medicationLoadError ?? scheduleLoadError ?? lowStockLoadError
+  const dataLoadError = patientsLoadError ?? medicationLoadError ?? scheduleLoadError
   const canOpenTreatment = Boolean(selectedMedication)
 
   useEffect(() => {
     if (!selectedPatientId || transientMedication) return
-    const currentMedicationStillExists = selectedPatientMedications.some(
-      (medication) => medication.id === selectedMedicationId,
-    )
-    if (selectedPatientMedications.length && (!selectedMedicationId || !currentMedicationStillExists)) {
-      const firstMedication = selectedPatientMedications[0]
-      setMedicationMode('existing')
-      setSelectedMedicationId(firstMedication.id)
-      scheduleForm.reset(scheduleDefaultValues(firstMedication.id))
+    if (!selectedMedicationIds) {
+      if (medicationMode === 'existing') {
+        setMedicationMode('new')
+        setSelectedMedicationId(null)
+        scheduleForm.reset(scheduleDefaultValues())
+      }
       return
     }
-    if (!selectedPatientMedications.length && medicationMode === 'existing') {
-      setMedicationMode('new')
-      setSelectedMedicationId(null)
-      scheduleForm.reset(scheduleDefaultValues())
+    if (medicationMode !== 'existing') return
+
+    const currentMedicationStillExists = selectedMedicationIds
+      .split(',')
+      .some((medicationId) => Number(medicationId) === selectedMedicationId)
+    if ((!selectedMedicationId || !currentMedicationStillExists) && firstSelectedMedicationId) {
+      setSelectedMedicationId(firstSelectedMedicationId)
+      scheduleForm.reset(scheduleDefaultValues(firstSelectedMedicationId))
     }
   }, [
+    firstSelectedMedicationId,
     medicationMode,
     scheduleForm,
     selectedMedicationId,
     selectedMedicationIds,
     selectedPatientId,
-    selectedPatientMedications,
     transientMedication,
   ])
 
@@ -374,7 +402,7 @@ export function MedicationPage() {
   const recordDoseMutation = useMutation({
     mutationFn: (values: DoseForm) =>
       medicationApi.recordDose({
-        administeredAt: ensureLocalDateTimeSeconds(values.occurredAt),
+        administeredAt: ensureLocalDateTimeSeconds(nowDateTimeInput()),
         medicationId: values.medicationId,
         notes: values.notes ?? '',
         patientId: doseActionTarget?.patient.id ?? selectedPatientId!,
@@ -382,6 +410,7 @@ export function MedicationPage() {
       }),
     onSuccess: (dose) => {
       setSetupMessage('Dosis administrada y stock actualizado.')
+      setDoseError(null)
       setDoseActionScheduleId(null)
       void invalidateMedicationData(dose.patientId)
     },
@@ -394,10 +423,11 @@ export function MedicationPage() {
         patientId: doseActionTarget?.patient.id ?? selectedPatientId!,
         reason: values.notes ?? '',
         scheduleId: values.scheduleId,
-        skippedAt: ensureLocalDateTimeSeconds(values.occurredAt),
+        skippedAt: ensureLocalDateTimeSeconds(nowDateTimeInput()),
       }),
     onSuccess: (dose) => {
       setSetupMessage('Dosis marcada como omitida.')
+      setDoseError(null)
       setDoseActionScheduleId(null)
       void invalidateMedicationData(dose.patientId)
     },
@@ -406,9 +436,35 @@ export function MedicationPage() {
   const updateMedicationMutation = useMutation({
     mutationFn: (values: MedicationForm) => medicationApi.updateMedication(editingMedicationId!, values),
     onSuccess: (medication) => {
+      setDeleteConfirmationOpen(false)
+      setEditError(null)
       setEditingMedicationId(null)
       setTransientMedication((current) => (current?.id === medication.id ? medication : current))
+      setSetupMessage('Medicamento actualizado correctamente.')
       void invalidateMedicationData(medication.patientId)
+    },
+  })
+
+  const deleteMedicationMutation = useMutation({
+    mutationFn: ({ medicationId }: { medicationId: number; patientId: number }) =>
+      medicationApi.deleteMedication(medicationId),
+    onSuccess: (_result, { medicationId, patientId }) => {
+      queryClient.setQueryData<Medication[]>(['medications', patientId], (current) =>
+        current?.filter((medication) => medication.id !== medicationId),
+      )
+      setDeleteConfirmationOpen(false)
+      setEditError(null)
+      setEditingMedicationId(null)
+      setTransientMedication((current) => (current?.id === medicationId ? null : current))
+      if (selectedMedicationId === medicationId) {
+        setSelectedMedicationId(null)
+        setActiveStep('medication')
+        scheduleForm.reset(scheduleDefaultValues())
+      }
+      setSetupMessage('Medicamento retirado de los medicamentos activos. Su historial clínico se conserva.')
+      void queryClient.invalidateQueries({ queryKey: ['medications', patientId] })
+      void queryClient.invalidateQueries({ queryKey: ['medication-schedules', patientId] })
+      void queryClient.invalidateQueries({ queryKey: ['low-stock', patientId] })
     },
   })
 
@@ -417,16 +473,20 @@ export function MedicationPage() {
     void queryClient.invalidateQueries({ queryKey: ['low-stock', patientId] })
   }
 
-  async function submitMutation<T>(runner: () => Promise<T>, requirePatient = true) {
+  async function submitMutation<T>(
+    runner: () => Promise<T>,
+    requirePatient = true,
+    setErrorMessage: (message: string | null) => void = setError,
+  ) {
     if (requirePatient && !selectedPatientId) {
-      setError('Selecciona un paciente antes de continuar')
+      setErrorMessage('Selecciona un paciente antes de continuar')
       return
     }
-    setError(null)
+    setErrorMessage(null)
     try {
       await runner()
     } catch (submitError) {
-      setError(getApiErrorMessage(submitError))
+      setErrorMessage(getApiErrorMessage(submitError))
     }
   }
 
@@ -452,12 +512,19 @@ export function MedicationPage() {
   }
 
   function openDoseAction(target: ScheduleWithContext) {
+    setDeleteConfirmationOpen(false)
+    setEditingMedicationId(null)
     setDoseActionScheduleId(target.schedule.id)
-    setError(null)
+    setDoseError(null)
+    setEditError(null)
     doseForm.reset(doseDefaultValues(target.medication.id, target.schedule.id))
   }
 
   function startEdit(medication: Medication) {
+    setDoseActionScheduleId(null)
+    setDoseError(null)
+    setDeleteConfirmationOpen(false)
+    setEditError(null)
     setEditingMedicationId(medication.id)
     editForm.reset({
       administrationRoute: medication.administrationRoute,
@@ -470,24 +537,36 @@ export function MedicationPage() {
     })
   }
 
+  function closeDoseModal() {
+    if (recordDoseMutation.isPending || skipDoseMutation.isPending) return
+    setDoseActionScheduleId(null)
+    setDoseError(null)
+  }
+
+  function closeEditModal() {
+    if (updateMedicationMutation.isPending || deleteMedicationMutation.isPending) return
+    setDeleteConfirmationOpen(false)
+    setEditError(null)
+    setEditingMedicationId(null)
+  }
+
   function startNewSetup() {
     setActiveStep('medication')
+    setDeleteConfirmationOpen(false)
     setDoseActionScheduleId(null)
+    setDoseError(null)
+    setEditError(null)
+    setEditingMedicationId(null)
     setError(null)
     setSetupMessage(null)
     medicationForm.reset(medicationDefaultValues())
-    if (flowMedications.length) {
-      setMedicationMode('existing')
-      chooseMedication(flowMedications[0].id)
-      return
-    }
     setMedicationMode('new')
     chooseMedication(0)
   }
 
   if (patientsQuery.isLoading) return <LoadingBlock />
   if (isPatientRoute && !hasRoutePatient) {
-    return <PatientAccessState message="El codigo de paciente de la ruta no es valido." />
+    return <PatientAccessState message="El código de paciente de la ruta no es válido." />
   }
   if (isPatientRoute && patientsQuery.isError) {
     return <PatientAccessState message={patientsLoadError ?? 'No se pudo verificar el acceso al paciente.'} patientId={routePatientId} />
@@ -495,7 +574,7 @@ export function MedicationPage() {
   if (isPatientRoute && patientsQuery.isSuccess && !routePatient) {
     return (
       <PatientAccessState
-        message="Este paciente no pertenece a tu equipo de cuidado. Vinculate antes de gestionar su medicacion."
+        message="Este paciente no pertenece a tu equipo de cuidado. Vincúlate antes de gestionar su medicación."
         patientId={routePatientId}
       />
     )
@@ -503,10 +582,19 @@ export function MedicationPage() {
 
   return (
     <>
-      <PageHeader
-        eyebrow={isPatientRoute ? 'Paciente activo' : 'Gestion clinica'}
-        title={isPatientRoute && selectedPatient ? `Medicacion - ${selectedPatient.fullName}` : 'Centro de medicacion'}
-      />
+      <header className="flex items-end justify-between gap-6">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.12em] text-blue-600">
+            {isPatientRoute ? 'Paciente vinculado' : 'Gestión clínica'}
+          </p>
+          <h1 className="mt-1 text-3xl font-black text-slate-950">
+            {isPatientRoute && selectedPatient ? `Medicación de ${selectedPatient.fullName}` : 'Centro de medicación'}
+          </h1>
+          <p className="mt-2 text-sm font-medium text-slate-500">
+            Administra el inventario, programa tratamientos y registra cada dosis desde un solo lugar.
+          </p>
+        </div>
+      </header>
       <FormError message={error || dataLoadError} />
       {setupMessage ? (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
@@ -514,18 +602,23 @@ export function MedicationPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-[minmax(440px,520px)_1fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[minmax(440px,520px)_1fr]">
         <div className="space-y-6">
           <Panel>
-            <PanelHeader
+            <MedicationSectionHeader
               action={
-                <Button onClick={startNewSetup} size="sm" variant="secondary">
+                <Button
+                  className={blueSecondaryButtonClass}
+                  onClick={startNewSetup}
+                  size="sm"
+                  variant="secondary"
+                >
                   <PackagePlus className="h-4 w-4" aria-hidden="true" />
-                  Nuevo
+                  Nuevo medicamento
                 </Button>
               }
-              eyebrow="Configuracion"
-              title="Nuevo tratamiento"
+              eyebrow="Configuración"
+              title="Preparar tratamiento"
             />
             <PanelBody className="space-y-5">
               <div className="grid grid-cols-2 gap-3">
@@ -538,7 +631,7 @@ export function MedicationPage() {
                       className={[
                         'flex h-16 min-w-0 items-center gap-3 rounded-lg border px-3 text-left transition',
                         current
-                          ? 'border-teal-700 bg-teal-700 text-white'
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20'
                           : done
                             ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                             : locked
@@ -579,7 +672,7 @@ export function MedicationPage() {
                       className={[
                         'h-10 rounded-lg border px-3 text-sm font-bold transition',
                         medicationMode === 'existing'
-                          ? 'border-teal-700 bg-teal-700 text-white'
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
                       ].join(' ')}
                       disabled={!flowMedications.length}
@@ -595,7 +688,7 @@ export function MedicationPage() {
                       className={[
                         'h-10 rounded-lg border px-3 text-sm font-bold transition',
                         medicationMode === 'new'
-                          ? 'border-teal-700 bg-teal-700 text-white'
+                          ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-600/20'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
                       ].join(' ')}
                       onClick={() => {
@@ -632,17 +725,7 @@ export function MedicationPage() {
                                     {enumLabel(selectedMedication.administrationRoute)}
                                   </p>
                                 </div>
-                                <StatusBadge
-                                  tone={
-                                    selectedMedication.stockQuantity <= selectedMedication.lowStockThreshold
-                                      ? 'amber'
-                                      : 'emerald'
-                                  }
-                                >
-                                  {selectedMedication.stockQuantity <= selectedMedication.lowStockThreshold
-                                    ? 'Stock bajo'
-                                    : 'Activo'}
-                                </StatusBadge>
+                              <StatusBadge tone="emerald">Activo</StatusBadge>
                               </div>
                               <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
                                 <div>
@@ -662,7 +745,7 @@ export function MedicationPage() {
                               </div>
                             </div>
                           ) : null}
-                          <Button className="w-full" onClick={continueToTreatment}>
+                          <Button className={`w-full ${blueButtonClass}`} onClick={continueToTreatment}>
                             <CalendarClock className="h-4 w-4" aria-hidden="true" />
                             Programar tratamiento
                           </Button>
@@ -680,9 +763,13 @@ export function MedicationPage() {
                     >
                       <TextField
                         error={medicationForm.formState.errors.name?.message}
-                        label="Nombre del medicamento"
+                        label="Nombre del medicamento (genérico o comercial)"
+                        placeholder="Ej. Paracetamol o Panadol"
                         {...medicationForm.register('name')}
                       />
+                      <p className="-mt-2 text-xs font-medium leading-relaxed text-slate-500">
+                        Este nombre identifica qué medicamento corresponde al tratamiento, las dosis y las alertas de stock.
+                      </p>
                       <div className="grid grid-cols-2 gap-3">
                         <TextField
                           error={medicationForm.formState.errors.dosageAmount?.message}
@@ -700,7 +787,7 @@ export function MedicationPage() {
                       </div>
                       <SelectField
                         error={medicationForm.formState.errors.administrationRoute?.message}
-                        label="Via"
+                        label="Vía"
                         options={routeOptions}
                         {...medicationForm.register('administrationRoute')}
                       />
@@ -724,7 +811,11 @@ export function MedicationPage() {
                         type="date"
                         {...medicationForm.register('expirationDate')}
                       />
-                      <Button className="w-full" isLoading={registerMedicationMutation.isPending} type="submit">
+                      <Button
+                        className={`w-full ${blueButtonClass}`}
+                        isLoading={registerMedicationMutation.isPending}
+                        type="submit"
+                      >
                         <Pill className="h-4 w-4" aria-hidden="true" />
                         Guardar medicamento
                       </Button>
@@ -748,7 +839,12 @@ export function MedicationPage() {
                           {selectedMedication?.name ?? 'Seleccione medicamento'}
                         </p>
                       </div>
-                      <Button onClick={() => setActiveStep('medication')} size="sm" variant="secondary">
+                      <Button
+                        className={blueSecondaryButtonClass}
+                        onClick={() => setActiveStep('medication')}
+                        size="sm"
+                        variant="secondary"
+                      >
                         Cambiar
                       </Button>
                     </div>
@@ -763,7 +859,7 @@ export function MedicationPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <TextField
                       error={scheduleForm.formState.errors.timesPerDay?.message}
-                      label="Veces por dia"
+                      label="Veces por día"
                       type="number"
                       {...scheduleForm.register('timesPerDay')}
                     />
@@ -788,7 +884,11 @@ export function MedicationPage() {
                       {...scheduleForm.register('endDate')}
                     />
                   </div>
-                  <Button className="w-full" isLoading={createScheduleMutation.isPending} type="submit">
+                  <Button
+                    className={`w-full ${blueButtonClass}`}
+                    isLoading={createScheduleMutation.isPending}
+                    type="submit"
+                  >
                     <ClipboardList className="h-4 w-4" aria-hidden="true" />
                     Crear tratamiento
                   </Button>
@@ -797,69 +897,13 @@ export function MedicationPage() {
             </PanelBody>
           </Panel>
 
-          {doseActionTarget ? (
-            <Panel>
-              <PanelHeader
-                action={
-                  <Button onClick={() => setDoseActionScheduleId(null)} size="sm" variant="ghost">
-                    <X className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                }
-                eyebrow="Dosis"
-                title="Registrar evento"
-              />
-              <PanelBody>
-                <form className="space-y-4">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-sm font-black text-slate-950">{doseActionTarget.medication.name}</p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {doseActionTarget.patient.fullName} - {enumLabel(doseActionTarget.schedule.frequencyType)} -{' '}
-                      {doseActionTarget.schedule.administrationTime}
-                    </p>
-                  </div>
-                  <input type="hidden" {...doseForm.register('medicationId')} />
-                  <input type="hidden" {...doseForm.register('scheduleId')} />
-                  <TextField
-                    error={doseForm.formState.errors.occurredAt?.message}
-                    label="Fecha y hora"
-                    type="datetime-local"
-                    {...doseForm.register('occurredAt')}
-                  />
-                  <TextareaField error={doseForm.formState.errors.notes?.message} label="Notas" {...doseForm.register('notes')} />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      isLoading={recordDoseMutation.isPending}
-                      onClick={doseForm.handleSubmit((values) =>
-                        submitMutation(() => recordDoseMutation.mutateAsync(values), false),
-                      )}
-                      type="button"
-                    >
-                      <Syringe className="h-4 w-4" aria-hidden="true" />
-                      Administrar
-                    </Button>
-                    <Button
-                      isLoading={skipDoseMutation.isPending}
-                      onClick={doseForm.handleSubmit((values) =>
-                        submitMutation(() => skipDoseMutation.mutateAsync(values), false),
-                      )}
-                      type="button"
-                      variant="secondary"
-                    >
-                      <XCircle className="h-4 w-4" aria-hidden="true" />
-                      Omitir
-                    </Button>
-                  </div>
-                </form>
-              </PanelBody>
-            </Panel>
-          ) : null}
         </div>
 
         <div className="space-y-6">
           <Panel>
-            <PanelHeader eyebrow="Dashboard" title="Tratamientos activos" />
+            <MedicationSectionHeader eyebrow="Dashboard" title="Tratamientos activos" />
             <PanelBody className="space-y-5">
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid gap-3 sm:grid-cols-2">
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Tratamientos</p>
                   <p className="mt-1 text-2xl font-black text-slate-950">{scheduleCards.length}</p>
@@ -868,10 +912,6 @@ export function MedicationPage() {
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Medicamentos</p>
                   <p className="mt-1 text-2xl font-black text-slate-950">{allMedications.length}</p>
                 </div>
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-amber-700">Stock bajo</p>
-                  <p className="mt-1 text-2xl font-black text-amber-900">{lowStockCount}</p>
-                </div>
               </div>
 
               {scheduleLoadError && !scheduleCards.length ? (
@@ -879,7 +919,7 @@ export function MedicationPage() {
               ) : schedulesLoading ? (
                 <LoadingBlock />
               ) : scheduleCards.length ? (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid gap-3 md:grid-cols-2">
                   {scheduleCards.map((item) => (
                     <article
                       className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
@@ -892,15 +932,17 @@ export function MedicationPage() {
                             {item.patient.fullName}
                           </p>
                         </div>
-                        <StatusBadge tone="teal">{enumLabel(item.schedule.frequencyType)}</StatusBadge>
+                        <StatusBadge tone="blue">{enumLabel(item.schedule.frequencyType)}</StatusBadge>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Hora</p>
-                          <p className="font-bold text-slate-800">{item.schedule.administrationTime}</p>
+                          <p className="font-bold text-slate-800">
+                            {formatTreatmentTime(item.schedule.administrationTime)}
+                          </p>
                         </div>
                         <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Veces/dia</p>
+                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Veces/día</p>
                           <p className="font-bold text-slate-800">{item.schedule.timesPerDay}</p>
                         </div>
                         <div>
@@ -913,7 +955,7 @@ export function MedicationPage() {
                         </div>
                       </div>
                       <div className="mt-4 grid grid-cols-2 gap-2">
-                        <Button onClick={() => openDoseAction(item)} size="sm">
+                        <Button className={blueButtonClass} onClick={() => openDoseAction(item)} size="sm">
                           <Syringe className="h-4 w-4" aria-hidden="true" />
                           Dosis
                         </Button>
@@ -932,52 +974,41 @@ export function MedicationPage() {
           </Panel>
 
           <Panel>
-            <PanelHeader eyebrow="Inventario" title="Medicamentos activos" />
+            <MedicationSectionHeader eyebrow="Inventario" title="Medicamentos activos" />
             <PanelBody>
               {medicationLoadError && !allMedications.length ? (
                 <FormError message={medicationLoadError} />
               ) : dashboardLoading ? (
                 <LoadingBlock />
               ) : allMedications.length ? (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="divide-y divide-slate-200 rounded-lg border border-slate-200 bg-white">
                   {allMedications.map(({ medication, patient }) => (
-                    <article
-                      className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+                    <div
+                      className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[minmax(180px,1.4fr)_minmax(160px,1fr)_90px_120px_auto] md:items-center"
                       key={medication.id}
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-slate-950">{medication.name}</p>
-                          <p className="mt-1 truncate text-xs font-semibold text-slate-500">{patient.fullName}</p>
-                        </div>
-                        <StatusBadge tone={medication.stockQuantity <= medication.lowStockThreshold ? 'amber' : 'emerald'}>
-                          {medication.stockQuantity <= medication.lowStockThreshold ? 'Stock bajo' : 'Activo'}
-                        </StatusBadge>
+                      <div className="min-w-0">
+                        <p className="truncate font-black text-slate-950">{medication.name}</p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">{patient.fullName}</p>
                       </div>
-                      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Dosis</p>
-                          <p className="font-bold text-slate-800">
-                            {medication.dosageAmount} {medication.dosageUnit}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Via</p>
-                          <p className="font-bold text-slate-800">{enumLabel(medication.administrationRoute)}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stock</p>
-                          <p className="font-bold text-slate-800">
-                            {medication.stockQuantity}/{medication.lowStockThreshold}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Vence</p>
-                          <p className="font-bold text-slate-800">{formatDate(medication.expirationDate)}</p>
-                        </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Dosis</p>
+                        <p className="font-bold text-slate-800">
+                          {medication.dosageAmount} {medication.dosageUnit} · {enumLabel(medication.administrationRoute)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Stock</p>
+                        <p className="font-bold text-slate-800">
+                          {medication.stockQuantity}/{medication.lowStockThreshold}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Vence</p>
+                        <p className="font-bold text-slate-800">{formatDate(medication.expirationDate)}</p>
                       </div>
                       <Button
-                        className="mt-4 w-full"
+                        className="md:justify-self-end"
                         onClick={() => startEdit(medication)}
                         size="sm"
                         variant="secondary"
@@ -985,7 +1016,7 @@ export function MedicationPage() {
                         <Pencil className="h-4 w-4" aria-hidden="true" />
                         Editar
                       </Button>
-                    </article>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -994,71 +1025,9 @@ export function MedicationPage() {
             </PanelBody>
           </Panel>
 
-          {editingMedicationId ? (
+          {!isPatientRoute ? (
             <Panel>
-              <PanelHeader eyebrow="Edicion" title="Editar medicamento" />
-              <PanelBody>
-                <form
-                  className="grid grid-cols-4 gap-3"
-                  onSubmit={editForm.handleSubmit((values) =>
-                    submitMutation(() => updateMedicationMutation.mutateAsync(values), false),
-                  )}
-                >
-                  <TextField error={editForm.formState.errors.name?.message} label="Nombre" {...editForm.register('name')} />
-                  <TextField
-                    error={editForm.formState.errors.dosageAmount?.message}
-                    label="Dosis"
-                    step="0.01"
-                    type="number"
-                    {...editForm.register('dosageAmount')}
-                  />
-                  <SelectField
-                    error={editForm.formState.errors.dosageUnit?.message}
-                    label="Unidad"
-                    options={dosageUnitOptions}
-                    {...editForm.register('dosageUnit')}
-                  />
-                  <SelectField
-                    error={editForm.formState.errors.administrationRoute?.message}
-                    label="Via"
-                    options={routeOptions}
-                    {...editForm.register('administrationRoute')}
-                  />
-                  <TextField
-                    error={editForm.formState.errors.stockQuantity?.message}
-                    label="Stock"
-                    type="number"
-                    {...editForm.register('stockQuantity')}
-                  />
-                  <TextField
-                    error={editForm.formState.errors.lowStockThreshold?.message}
-                    label="Alerta"
-                    type="number"
-                    {...editForm.register('lowStockThreshold')}
-                  />
-                  <TextField
-                    error={editForm.formState.errors.expirationDate?.message}
-                    label="Vencimiento"
-                    type="date"
-                    {...editForm.register('expirationDate')}
-                  />
-                  <div className="flex items-end gap-2">
-                    <Button isLoading={updateMedicationMutation.isPending} type="submit">
-                      <Save className="h-4 w-4" aria-hidden="true" />
-                      Guardar
-                    </Button>
-                    <Button onClick={() => setEditingMedicationId(null)} type="button" variant="secondary">
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                </form>
-              </PanelBody>
-            </Panel>
-          ) : null}
-
-          <div className="grid grid-cols-2 gap-6">
-            <Panel>
-              <PanelHeader eyebrow="Paciente seleccionado" title="Tratamientos" />
+              <MedicationSectionHeader eyebrow="Paciente seleccionado" title="Tratamientos" />
               <PanelBody>
                 {scheduleLoadError && !selectedPatientSchedules.length ? (
                   <FormError message={scheduleLoadError} />
@@ -1076,10 +1045,10 @@ export function MedicationPage() {
                               {medication?.name ?? 'Medicamento'}
                             </p>
                             <p className="text-xs font-semibold text-slate-500">
-                              {enumLabel(schedule.frequencyType)} - {schedule.administrationTime}
+                              {enumLabel(schedule.frequencyType)} - {formatTreatmentTime(schedule.administrationTime)}
                             </p>
                           </div>
-                          <StatusBadge tone="teal">{formatDate(schedule.startDate)}</StatusBadge>
+                          <StatusBadge tone="blue">{formatDate(schedule.startDate)}</StatusBadge>
                         </div>
                       )
                     })}
@@ -1089,36 +1058,249 @@ export function MedicationPage() {
                 )}
               </PanelBody>
             </Panel>
-
-            <Panel>
-              <PanelHeader eyebrow="Alertas" title="Stock bajo" />
-              <PanelBody>
-                {lowStockLoadError ? (
-                  <FormError message={lowStockLoadError} />
-                ) : lowStockQuery.isLoading ? (
-                  <LoadingBlock />
-                ) : lowStockQuery.data?.length ? (
-                  <div className="space-y-2">
-                    {lowStockQuery.data.map((alert) => (
-                      <div
-                        className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-900"
-                        key={alert.medicationId}
-                      >
-                        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                        <span>
-                          {alert.medicationName}: {alert.currentStock}/{alert.threshold}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <EmptyState title="Sin alertas de stock" />
-                )}
-              </PanelBody>
-            </Panel>
-          </div>
+          ) : null}
         </div>
       </div>
+
+      <Modal
+        closeDisabled={recordDoseMutation.isPending || skipDoseMutation.isPending}
+        description={
+          doseActionTarget
+            ? `${doseActionTarget.patient.fullName} · ${enumLabel(doseActionTarget.schedule.frequencyType)} · ${formatTreatmentTime(doseActionTarget.schedule.administrationTime)}`
+            : undefined
+        }
+        eyebrow="Dosis"
+        isOpen={Boolean(doseActionTarget)}
+        onClose={closeDoseModal}
+        size="sm"
+        title={doseActionTarget ? `Registrar administración: ${doseActionTarget.medication.name}` : 'Registrar administración'}
+      >
+        {doseActionTarget ? (
+          <form
+            className="space-y-5"
+            onSubmit={doseForm.handleSubmit((values) =>
+              submitMutation(() => recordDoseMutation.mutateAsync(values), false, setDoseError),
+            )}
+          >
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <p className="text-sm font-black text-slate-950">{doseActionTarget.medication.name}</p>
+              <p className="mt-1 text-xs font-semibold text-slate-600">
+                {doseActionTarget.medication.dosageAmount} {doseActionTarget.medication.dosageUnit} ·{' '}
+                {enumLabel(doseActionTarget.medication.administrationRoute)}
+              </p>
+            </div>
+
+            {doseError ? (
+              <div role="alert">
+                <FormError message={doseError} />
+              </div>
+            ) : null}
+
+            <input type="hidden" {...doseForm.register('medicationId')} />
+            <input type="hidden" {...doseForm.register('scheduleId')} />
+            <input type="hidden" {...doseForm.register('occurredAt')} />
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm font-semibold text-slate-600">
+              Se registrará automáticamente con la hora actual de Perú al confirmar.
+            </div>
+            <TextareaField
+              error={doseForm.formState.errors.notes?.message}
+              label="Notas (opcional)"
+              placeholder="Añade una observación si es necesario"
+              {...doseForm.register('notes')}
+            />
+
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Button
+                className={blueButtonClass}
+                disabled={skipDoseMutation.isPending}
+                isLoading={recordDoseMutation.isPending}
+                type="submit"
+              >
+                <Syringe className="h-4 w-4" aria-hidden="true" />
+                Registrar administrada
+              </Button>
+              <Button
+                disabled={recordDoseMutation.isPending}
+                isLoading={skipDoseMutation.isPending}
+                onClick={doseForm.handleSubmit((values) =>
+                  submitMutation(() => skipDoseMutation.mutateAsync(values), false, setDoseError),
+                )}
+                type="button"
+                variant="secondary"
+              >
+                <XCircle className="h-4 w-4" aria-hidden="true" />
+                Registrar omitida
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </Modal>
+
+      <Modal
+        closeDisabled={updateMedicationMutation.isPending || deleteMedicationMutation.isPending}
+        description="Actualiza sus datos o retíralo de la lista de medicamentos activos."
+        eyebrow="Inventario"
+        isOpen={Boolean(editingMedication)}
+        onClose={closeEditModal}
+        size="md"
+        title="Editar medicamento"
+      >
+        {editingMedication ? (
+          <div className="space-y-6">
+            {editError ? (
+              <div role="alert">
+                <FormError message={editError} />
+              </div>
+            ) : null}
+
+            <form
+              className="space-y-4"
+              onSubmit={editForm.handleSubmit((values) =>
+                submitMutation(() => updateMedicationMutation.mutateAsync(values), false, setEditError),
+              )}
+            >
+              <div>
+                <TextField
+                  error={editForm.formState.errors.name?.message}
+                  label="Nombre del medicamento (genérico o comercial)"
+                  placeholder="Ej. Paracetamol o Panadol"
+                  {...editForm.register('name')}
+                />
+                <p className="mt-1 text-xs font-medium leading-relaxed text-slate-500">
+                  Permite identificar el medicamento correcto en tratamientos, dosis, reportes y alertas de stock.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  error={editForm.formState.errors.dosageAmount?.message}
+                  label="Dosis base"
+                  step="0.01"
+                  type="number"
+                  {...editForm.register('dosageAmount')}
+                />
+                <SelectField
+                  error={editForm.formState.errors.dosageUnit?.message}
+                  label="Unidad"
+                  options={dosageUnitOptions}
+                  {...editForm.register('dosageUnit')}
+                />
+              </div>
+              <SelectField
+                error={editForm.formState.errors.administrationRoute?.message}
+                label="Vía de administración"
+                options={routeOptions}
+                {...editForm.register('administrationRoute')}
+              />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <TextField
+                  error={editForm.formState.errors.stockQuantity?.message}
+                  label="Stock disponible"
+                  type="number"
+                  {...editForm.register('stockQuantity')}
+                />
+                <TextField
+                  error={editForm.formState.errors.lowStockThreshold?.message}
+                  label="Alerta de stock"
+                  type="number"
+                  {...editForm.register('lowStockThreshold')}
+                />
+              </div>
+              <TextField
+                error={editForm.formState.errors.expirationDate?.message}
+                label="Vencimiento del stock"
+                type="date"
+                {...editForm.register('expirationDate')}
+              />
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
+                <Button
+                  disabled={updateMedicationMutation.isPending || deleteMedicationMutation.isPending}
+                  onClick={closeEditModal}
+                  type="button"
+                  variant="secondary"
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className={blueButtonClass}
+                  disabled={deleteMedicationMutation.isPending}
+                  isLoading={updateMedicationMutation.isPending}
+                  type="submit"
+                >
+                  <Save className="h-4 w-4" aria-hidden="true" />
+                  Guardar cambios
+                </Button>
+              </div>
+            </form>
+
+            <section className="border-t border-slate-200 pt-5" aria-labelledby="retire-medication-title">
+              {deleteConfirmationOpen ? (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
+                  <h3 className="text-sm font-black text-rose-950" id="retire-medication-title">
+                    ¿Retirar {editingMedication.name}?
+                  </h3>
+                  <p className="mt-2 text-sm font-medium leading-relaxed text-rose-900">
+                    Dejará de aparecer entre los medicamentos activos y no podrá usarse en nuevos tratamientos. Las
+                    dosis y registros existentes se conservarán en el historial clínico.
+                  </p>
+                  <div className="mt-4 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      disabled={deleteMedicationMutation.isPending}
+                      onClick={() => setDeleteConfirmationOpen(false)}
+                      type="button"
+                      variant="secondary"
+                    >
+                      Volver
+                    </Button>
+                    <Button
+                      isLoading={deleteMedicationMutation.isPending}
+                      onClick={() =>
+                        void submitMutation(
+                          () =>
+                            deleteMedicationMutation.mutateAsync({
+                              medicationId: editingMedication.id,
+                              patientId: editingMedication.patientId,
+                            }),
+                          false,
+                          setEditError,
+                        )
+                      }
+                      type="button"
+                      variant="danger"
+                    >
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      Confirmar retiro
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-950" id="retire-medication-title">
+                      Retirar medicamento
+                    </h3>
+                    <p className="mt-1 text-sm font-medium text-slate-500">
+                      Lo quita de la lista activa, pero conserva su historial clínico.
+                    </p>
+                  </div>
+                  <Button
+                    disabled={updateMedicationMutation.isPending}
+                    onClick={() => {
+                      setEditError(null)
+                      setDeleteConfirmationOpen(true)
+                    }}
+                    type="button"
+                    variant="danger"
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    Retirar medicamento
+                  </Button>
+                </div>
+              )}
+            </section>
+          </div>
+        ) : null}
+      </Modal>
     </>
   )
 }

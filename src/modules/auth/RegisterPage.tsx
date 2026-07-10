@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate } from 'react-router-dom'
@@ -56,9 +56,9 @@ export function RegisterPage() {
   }
 
   return (
-    <div className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50">
+    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl shadow-slate-200/50">
       <div className="mb-8">
-        <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Registro medico</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-blue-600">Registro médico</p>
         <h2 className="mt-2 text-2xl font-bold text-slate-950">Crear cuenta</h2>
       </div>
 
@@ -91,7 +91,7 @@ export function RegisterPage() {
       </form>
 
       <div className="mt-6 border-t border-slate-200 pt-5 text-sm font-semibold text-slate-600">
-        <Link className="text-teal-700 hover:text-teal-900" to="/login">
+        <Link className="text-blue-600 hover:text-blue-700" to="/login">
           Ya tengo cuenta
         </Link>
       </div>

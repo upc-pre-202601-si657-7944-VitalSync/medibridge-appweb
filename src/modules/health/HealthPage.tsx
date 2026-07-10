@@ -22,7 +22,7 @@ import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 
 const observationSchema = z.object({
   bodyTemperature: z.coerce.number().min(30).max(45),
-  clinicalNotes: z.string().min(3, 'Nota clinica requerida'),
+  clinicalNotes: z.string().min(3, 'Nota clínica requerida'),
   diastolicBloodPressure: z.coerce.number().int().min(30).max(180),
   emotionalNotes: z.string().optional(),
   emotionalState: z.enum(['CALM', 'ANXIOUS', 'SAD', 'IRRITABLE', 'CONFUSED', 'APATHETIC']),
@@ -74,7 +74,7 @@ export function HealthPage() {
   const recordObservationMutation = useMutation({
     mutationFn: (values: ObservationForm) => {
       if (!doctorProfile) {
-        throw new Error('Completa tu perfil medico antes de registrar observaciones')
+        throw new Error('Completa tu perfil médico antes de registrar observaciones')
       }
 
       return healthApi.recordObservation(patientId, {
@@ -115,24 +115,24 @@ export function HealthPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Paciente activo" title={`Monitoreo clinico - ${patient?.fullName ?? ''}`} />
+      <PageHeader eyebrow="Paciente vinculado" title={`Monitoreo clínico - ${patient?.fullName ?? ''}`} />
       <FormError message={error} />
 
-      <div className="grid grid-cols-[440px_1fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[440px_1fr]">
         <Panel>
-          <PanelHeader eyebrow="Health Monitoring" title="Registrar observacion" />
+          <PanelHeader eyebrow="Salud" title="Registrar observación" />
           <PanelBody>
             <form className="space-y-4" onSubmit={form.handleSubmit(recordObservation)}>
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Medico responsable</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Médico responsable</p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
-                  {doctorProfile?.fullName ?? 'Perfil medico pendiente'}
+                  {doctorProfile?.fullName ?? 'Perfil médico pendiente'}
                 </p>
               </div>
               <TextField error={form.formState.errors.recordedAt?.message} label="Fecha" type="datetime-local" {...form.register('recordedAt')} />
               <div className="grid grid-cols-2 gap-3">
-                <TextField error={form.formState.errors.systolicBloodPressure?.message} label="Sistolica" type="number" {...form.register('systolicBloodPressure')} />
-                <TextField error={form.formState.errors.diastolicBloodPressure?.message} label="Diastolica" type="number" {...form.register('diastolicBloodPressure')} />
+                <TextField error={form.formState.errors.systolicBloodPressure?.message} label="Sistólica" type="number" {...form.register('systolicBloodPressure')} />
+                <TextField error={form.formState.errors.diastolicBloodPressure?.message} label="Diastólica" type="number" {...form.register('diastolicBloodPressure')} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <TextField error={form.formState.errors.bodyTemperature?.message} label="Temperatura" type="number" step="0.1" {...form.register('bodyTemperature')} />
@@ -145,7 +145,7 @@ export function HealthPage() {
                 {...form.register('emotionalState')}
               />
               <TextareaField error={form.formState.errors.emotionalNotes?.message} label="Notas emocionales" {...form.register('emotionalNotes')} />
-              <TextareaField error={form.formState.errors.clinicalNotes?.message} label="Notas clinicas" {...form.register('clinicalNotes')} />
+              <TextareaField error={form.formState.errors.clinicalNotes?.message} label="Notas clínicas" {...form.register('clinicalNotes')} />
               <Button className="w-full" isLoading={recordObservationMutation.isPending} type="submit">
                 <HeartPulse className="h-4 w-4" aria-hidden="true" />
                 Registrar
@@ -155,14 +155,14 @@ export function HealthPage() {
         </Panel>
 
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid gap-6 lg:grid-cols-2">
             <Panel>
-              <PanelHeader eyebrow="Resumen" title="Resumen clinico" />
+              <PanelHeader eyebrow="Resumen" title="Resumen clínico" />
               <PanelBody>
                 {summaryQuery.data?.summary ? (
                   <p className="text-sm leading-6 text-slate-700">{summaryQuery.data.summary}</p>
                 ) : (
-                  <EmptyState title="Sin resumen clinico disponible" />
+                  <EmptyState title="Sin resumen clínico disponible" />
                 )}
               </PanelBody>
             </Panel>
@@ -203,7 +203,7 @@ export function HealthPage() {
                       <th>Temp</th>
                       <th>Dolor</th>
                       <th>Estado</th>
-                      <th>Nota clinica</th>
+                      <th>Nota clínica</th>
                     </tr>
                   </thead>
                   <tbody>

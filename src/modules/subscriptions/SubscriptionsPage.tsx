@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
@@ -77,7 +77,7 @@ export function SubscriptionsPage() {
   const confirmCheckoutMutation = useMutation({
     mutationFn: paymentsApi.confirmCheckoutSession,
     onSuccess: () => {
-      setMockMessage('Pago confirmado por Stripe. La suscripcion quedo activa.')
+      setMockMessage('Pago confirmado por Stripe. La suscripción quedó activa.')
       void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['invoices', user?.id] })
@@ -91,7 +91,7 @@ export function SubscriptionsPage() {
   const approveMockSubscriptionMutation = useMutation({
     mutationFn: paymentsApi.approveMockSubscription,
     onSuccess: () => {
-      setMockMessage('Pago mock aprobado. La suscripcion quedo activa localmente.')
+      setMockMessage('Pago mock aprobado. La suscripción quedó activa localmente.')
       void queryClient.invalidateQueries({ queryKey: ['active-subscription', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['subscriptions', user?.id] })
       void queryClient.invalidateQueries({ queryKey: ['invoices', user?.id] })
@@ -182,7 +182,7 @@ export function SubscriptionsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Pagos & Planes" title="Suscripcion institucional" />
+      <PageHeader eyebrow="Pagos & Planes" title="Suscripción institucional" />
       <FormError message={error} />
       {checkoutStatus === 'cancelled' ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
@@ -195,7 +195,7 @@ export function SubscriptionsPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-[420px_1fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <Panel>
           <PanelHeader eyebrow="Nuevo plan" title="Comprar o mejorar plan" />
           <PanelBody>
@@ -234,16 +234,16 @@ export function SubscriptionsPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Estado actual" title="Suscripcion activa" />
+          <PanelHeader eyebrow="Estado actual" title="Suscripción activa" />
           <PanelBody>
             {activeSubscriptionQuery.isLoading ? (
               <LoadingBlock />
             ) : activeSubscriptionQuery.data ? (
               <div className="space-y-4">
-                <div className="rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50 to-slate-50 p-5">
+                <div className="rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-slate-50 p-5">
                   <div className="mb-3 flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Plan activo</p>
+                      <p className="text-xs font-bold uppercase tracking-wide text-blue-600">Plan activo</p>
                       <h2 className="mt-0.5 text-2xl font-bold text-slate-950">
                         {activeSubscriptionQuery.data.plan.displayName}
                       </h2>
@@ -252,7 +252,7 @@ export function SubscriptionsPage() {
                       {activeSubscriptionQuery.data.status}
                     </StatusBadge>
                   </div>
-                  <p className="text-lg font-bold text-teal-700">
+                  <p className="text-lg font-bold text-blue-600">
                     {formatCurrency(activeSubscriptionQuery.data.plan.price, activeSubscriptionQuery.data.plan.currency)}
                     <span className="ml-1 text-sm font-semibold text-slate-500">
                       / {enumLabel(activeSubscriptionQuery.data.plan.billingCycle ?? activeSubscriptionQuery.data.plan.planType)}
@@ -284,7 +284,7 @@ export function SubscriptionsPage() {
                     variant="danger"
                     size="sm"
                   >
-                    Cancelar suscripcion
+                    Cancelar suscripción
                   </Button>
                   <Button
                     isLoading={renewSubscriptionMutation.isPending}
@@ -298,13 +298,13 @@ export function SubscriptionsPage() {
                 </div>
               </div>
             ) : (
-              <EmptyState title="Sin suscripcion activa" />
+              <EmptyState title="Sin suscripción activa" />
             )}
           </PanelBody>
         </Panel>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 xl:grid-cols-2">
         <Panel>
           <PanelHeader eyebrow="Historial" title="Suscripciones" />
           <PanelBody>
@@ -338,7 +338,7 @@ export function SubscriptionsPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Invoices" title="Facturas" />
+          <PanelHeader eyebrow="Facturación" title="Facturas" />
           <PanelBody>
             {invoicesQuery.data?.length ? (
               <table className="clinical-table">
@@ -391,20 +391,20 @@ function PlanSelector({ form }: { form: UseFormReturn<SubscriptionForm> }) {
               type="button"
               onClick={() => form.setValue('planType', value, { shouldValidate: true })}
               className={[
-                'rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2',
+                'rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2',
                 active && premium
-                  ? 'border-teal-500 bg-teal-50 ring-1 ring-teal-400'
+                  ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-400'
                   : active
                   ? 'border-slate-400 bg-slate-100 ring-1 ring-slate-300'
                   : 'border-slate-200 bg-white hover:bg-slate-50',
               ].join(' ')}
             >
               <div className="mb-1 flex items-center gap-1.5">
-                <Icon className={`h-4 w-4 ${active && premium ? 'text-teal-700' : 'text-slate-500'}`} aria-hidden="true" />
-                <span className={`text-xs font-bold ${active && premium ? 'text-teal-800' : 'text-slate-700'}`}>{label}</span>
-                {active ? <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-teal-600" aria-hidden="true" /> : null}
+                <Icon className={`h-4 w-4 ${active && premium ? 'text-blue-600' : 'text-slate-500'}`} aria-hidden="true" />
+                <span className={`text-xs font-bold ${active && premium ? 'text-blue-800' : 'text-slate-700'}`}>{label}</span>
+                {active ? <CheckCircle2 className="ml-auto h-3.5 w-3.5 text-blue-600" aria-hidden="true" /> : null}
               </div>
-              <p className={`text-xs ${active && premium ? 'text-teal-700' : 'text-slate-500'}`}>{description}</p>
+              <p className={`text-xs ${active && premium ? 'text-blue-600' : 'text-slate-500'}`}>{description}</p>
             </button>
           )
         })}
@@ -421,7 +421,7 @@ function BillingCycleSelector({ form }: { form: UseFormReturn<SubscriptionForm> 
   ]
   return (
     <div>
-      <p className="field-label mb-1.5">Ciclo de facturacion</p>
+      <p className="field-label mb-1.5">Ciclo de facturación</p>
       <div className="flex gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
         {cycles.map(({ value, label, sub }) => {
           const active = selected === value
@@ -431,12 +431,12 @@ function BillingCycleSelector({ form }: { form: UseFormReturn<SubscriptionForm> 
               type="button"
               onClick={() => form.setValue('billingCycle', value, { shouldValidate: true })}
               className={[
-                'flex-1 rounded-md px-3 py-2 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600',
+                'flex-1 rounded-md px-3 py-2 text-center transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600',
                 active ? 'border border-slate-200 bg-white shadow-sm' : 'hover:bg-white/60',
               ].join(' ')}
             >
               <p className={`text-sm font-bold ${active ? 'text-slate-900' : 'text-slate-500'}`}>{label}</p>
-              <p className={`text-xs ${active ? 'font-semibold text-teal-700' : 'text-slate-400'}`}>{sub}</p>
+              <p className={`text-xs ${active ? 'font-semibold text-blue-600' : 'text-slate-400'}`}>{sub}</p>
             </button>
           )
         })}

@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -126,19 +126,19 @@ export function OnboardingDoctorPage() {
           </Button>
         }
         eyebrow="Onboarding"
-        title="Completa tu perfil medico"
+        title="Completa tu perfil médico"
       />
 
       <FormError message={error} />
 
-      <div className="grid grid-cols-[1.1fr_0.9fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <Panel>
-          <PanelHeader eyebrow="Perfil medico" title="Datos del doctor" />
+          <PanelHeader eyebrow="Perfil médico" title="Datos del doctor" />
           <PanelBody className="space-y-6">
             {currentDoctorQuery.isLoading ? <LoadingBlock /> : null}
 
             <form
-              className="grid grid-cols-[1fr_auto] items-end gap-3"
+              className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end"
               onSubmit={doctorForm.handleSubmit(createDoctor)}
             >
               <TextField
@@ -158,22 +158,22 @@ export function OnboardingDoctorPage() {
                 <p className="text-xs font-bold uppercase tracking-wide text-emerald-700">Perfil listo</p>
                 <p className="mt-1 text-sm font-bold text-emerald-900">{workspace.doctorProfile.fullName}</p>
                 <p className="mt-1 text-xs font-semibold text-emerald-800">
-                  Vinculado automaticamente al usuario {user?.username}
+                  Vinculado automáticamente al usuario {user?.username}
                 </p>
               </div>
             ) : (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">
-                Crea tu perfil medico para entrar al resto de la aplicacion.
+                Crea tu perfil médico para entrar al resto de la aplicación.
               </div>
             )}
           </PanelBody>
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Payments" title="Suscripcion institucional" />
+          <PanelHeader eyebrow="Pagos" title="Suscripción institucional" />
           <PanelBody className="space-y-5">
             {activeSubscriptionQuery.data ? (
-              <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4">
+              <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
                 <div className="flex items-center justify-between gap-4">
                   <p className="font-bold text-slate-950">{activeSubscriptionQuery.data.plan.displayName}</p>
                   <StatusBadge tone="emerald">{activeSubscriptionQuery.data.status}</StatusBadge>
@@ -196,7 +196,7 @@ export function OnboardingDoctorPage() {
               />
               <SelectField
                 error={subscriptionForm.formState.errors.billingCycle?.message}
-                label="Facturacion"
+                label="Facturación"
                 options={[
                   { label: 'Mensual', value: 'MONTHLY' },
                   { label: 'Anual', value: 'ANNUALLY' },

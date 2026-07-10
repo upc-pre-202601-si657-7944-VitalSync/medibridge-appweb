@@ -23,9 +23,9 @@ export function PanelHeader({
     <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
       <div>
         {eyebrow ? (
-          <p className="text-xs font-bold uppercase tracking-wide text-teal-700">{eyebrow}</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-blue-600">{eyebrow}</p>
         ) : null}
-        <h2 className="text-base font-bold text-slate-950">{title}</h2>
+        <h2 className="text-base font-bold text-slate-900">{title}</h2>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>

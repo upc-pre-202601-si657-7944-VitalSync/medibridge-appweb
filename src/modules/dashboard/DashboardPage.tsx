@@ -27,7 +27,7 @@ function MetricTile({
     <Panel className="p-5">
       <div className="flex items-center justify-between gap-4">
         <p className="text-xs font-bold uppercase tracking-wide text-slate-400">{label}</p>
-        <Icon className="h-5 w-5 text-teal-700" aria-hidden="true" />
+        <Icon className="h-5 w-5 text-blue-600" aria-hidden="true" />
       </div>
       <p className="mt-2 text-3xl font-bold text-slate-950">{value}</p>
     </Panel>
@@ -37,7 +37,6 @@ function MetricTile({
 export function DashboardPage() {
   const { user } = useAuth()
   const [workspace, setWorkspace] = useState(() => getClinicalWorkspace())
-  const patientId = workspace.activePatient?.id
 
   useEffect(() => {
     function refreshWorkspace() {
@@ -59,6 +58,11 @@ export function DashboardPage() {
     queryKey: ['my-patients'],
     retry: false,
   })
+  const activePatient =
+    workspace.activePatient && myPatientsQuery.isSuccess
+      ? myPatientsQuery.data.find((patient) => patient.id === workspace.activePatient?.id) ?? null
+      : null
+  const patientId = activePatient?.id
 
   const appointmentsQuery = useQuery({
     enabled: Boolean(patientId),
@@ -95,18 +99,18 @@ export function DashboardPage() {
         actions={
           <div className="flex gap-2">
             <Link className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-800 hover:bg-slate-50" to="/onboarding/doctor">
-              Perfil medico
+              Perfil médico
             </Link>
-            <Link className="inline-flex h-10 items-center justify-center rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800" to="/patients">
+            <Link className="inline-flex h-10 items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700" to="/patients">
               Pacientes
             </Link>
           </div>
         }
-        eyebrow="MediBridge Clinical"
+        eyebrow="MediBridge Clínico"
         title="Dashboard"
       />
 
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <MetricTile icon={HeartPulse} label="Alertas" value={alertsQuery.data?.length ?? '-'} />
         <MetricTile icon={CalendarDays} label="Citas" value={appointmentsQuery.data?.length ?? '-'} />
         <MetricTile icon={Pill} label="Medicamentos" value={medicationsQuery.data?.length ?? '-'} />
@@ -134,15 +138,15 @@ export function DashboardPage() {
                   Abrir pacientes
                 </Button>
               }
-              title="No hay paciente activo"
+              title="Selecciona un paciente vinculado para ver su actividad"
             />
           </PanelBody>
         </Panel>
       ) : null}
 
-      <div className="grid grid-cols-[1fr_420px] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <Panel>
-          <PanelHeader eyebrow="Agenda" title="Proximas citas" />
+          <PanelHeader eyebrow="Agenda" title="Próximas citas" />
           <PanelBody>
             {appointmentsQuery.isLoading ? (
               <LoadingBlock />

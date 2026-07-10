@@ -14,7 +14,7 @@ import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 const trendTone = {
   DECLINING: 'red',
   IMPROVING: 'emerald',
-  STABLE: 'teal',
+  STABLE: 'blue',
 } as const
 
 export function AnalyticsPage() {
@@ -38,11 +38,11 @@ export function AnalyticsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Paciente activo" title={`Analitica - ${patient?.fullName ?? ''}`} />
+      <PageHeader eyebrow="Paciente vinculado" title={`Analítica - ${patient?.fullName ?? ''}`} />
 
-      <div className="grid grid-cols-[1fr_420px] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <Panel>
-          <PanelHeader eyebrow="Reports Analytics" title="Metricas" />
+          <PanelHeader eyebrow="Analítica" title="Métricas" />
           <PanelBody>
             {dashboardQuery.isLoading ? (
               <LoadingBlock />
@@ -54,12 +54,12 @@ export function AnalyticsPage() {
                     <XAxis dataKey="metric" tick={{ fill: '#475569', fontSize: 12 }} />
                     <YAxis tick={{ fill: '#475569', fontSize: 12 }} />
                     <Tooltip />
-                    <Bar dataKey="value" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                    <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <EmptyState title="Sin metricas disponibles" />
+              <EmptyState title="Sin métricas disponibles" />
             )}
           </PanelBody>
         </Panel>
@@ -87,13 +87,13 @@ export function AnalyticsPage() {
       </div>
 
       <Panel>
-        <PanelHeader eyebrow="Snapshots" title="Datos capturados" />
+        <PanelHeader eyebrow="Capturas" title="Datos capturados" />
         <PanelBody>
           {dashboardQuery.data?.metricSnapshots.length ? (
             <table className="clinical-table">
               <thead>
                 <tr>
-                  <th>Metrica</th>
+                  <th>Métrica</th>
                   <th>Valor</th>
                   <th>Unidad</th>
                   <th>Captura</th>

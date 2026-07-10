@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useParams } from 'react-router-dom'
 import { getApiErrorMessage } from '@/shared/api/httpClient'
@@ -20,7 +20,7 @@ export function usePatientRoute() {
   const patient = patientQuery.data?.find((item) => item.id === routePatientId)
   const isAuthorized = Boolean(patient)
   const accessError = !enabled
-    ? 'El codigo de paciente de la ruta no es valido.'
+    ? 'El código de paciente de la ruta no es válido.'
     : patientQuery.isError
       ? `No se pudo verificar tu acceso al paciente. ${getApiErrorMessage(patientQuery.error)}`
       : patientQuery.isSuccess && !patient

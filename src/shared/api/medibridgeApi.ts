@@ -216,6 +216,9 @@ export const medicationApi = {
     )
     return data
   },
+  async deleteMedication(medicationId: number) {
+    await httpClient.delete(`/api/v1/medications/${medicationId}`)
+  },
   async listLowStock(patientId: number) {
     const { data } = await httpClient.get<LowStockAlert[]>(
       `/api/v1/medications/patients/${patientId}/low-stock`,

@@ -21,7 +21,7 @@ import { PatientAccessState } from '@/modules/patients/PatientAccessState'
 import { usePatientRoute } from '@/modules/patients/usePatientRoute'
 
 const appointmentSchema = z.object({
-  durationInMinutes: z.coerce.number().int().min(15).max(240),
+  durationInMinutes: z.coerce.number().int().min(60, 'La duración mínima es 60 minutos').max(240),
   reason: z.string().min(3, 'Motivo requerido'),
   startsAt: z.string().min(1, 'Fecha requerida'),
 })
@@ -38,7 +38,7 @@ export function AppointmentsPage() {
   const form = useForm<AppointmentFormInput, unknown, AppointmentForm>({
     resolver: zodResolver(appointmentSchema),
     defaultValues: {
-      durationInMinutes: 45,
+      durationInMinutes: 60,
       reason: '',
       startsAt: nowDateTimeInput(),
     },
@@ -53,7 +53,7 @@ export function AppointmentsPage() {
   const createAppointmentMutation = useMutation({
     mutationFn: (values: AppointmentForm) => {
       if (!doctorProfile) {
-        throw new Error('Completa tu perfil medico antes de programar citas')
+        throw new Error('Completa tu perfil médico antes de programar citas')
       }
 
       return appointmentsApi.createMedicalAppointment({
@@ -66,7 +66,7 @@ export function AppointmentsPage() {
     },
     onSuccess: () => {
       form.reset({
-        durationInMinutes: 45,
+        durationInMinutes: 60,
         reason: '',
         startsAt: nowDateTimeInput(),
       })
@@ -88,17 +88,17 @@ export function AppointmentsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Paciente activo" title={`Citas medicas - ${patient?.fullName ?? ''}`} />
-      <div className="grid grid-cols-[420px_1fr] gap-6">
+      <PageHeader eyebrow="Paciente vinculado" title={`Citas médicas - ${patient?.fullName ?? ''}`} />
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <Panel>
-          <PanelHeader eyebrow="Appointments" title="Nueva cita" />
+          <PanelHeader eyebrow="Citas" title="Nueva cita" />
           <PanelBody>
             <form className="space-y-4" onSubmit={form.handleSubmit(createAppointment)}>
               <FormError message={error} />
               <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Medico responsable</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Médico responsable</p>
                 <p className="mt-1 text-sm font-bold text-slate-900">
-                  {doctorProfile?.fullName ?? 'Perfil medico pendiente'}
+                  {doctorProfile?.fullName ?? 'Perfil médico pendiente'}
                 </p>
               </div>
               <TextField
@@ -109,7 +109,9 @@ export function AppointmentsPage() {
               />
               <TextField
                 error={form.formState.errors.durationInMinutes?.message}
-                label="Duracion minutos"
+                label="Duración en minutos"
+                min={60}
+                step={15}
                 type="number"
                 {...form.register('durationInMinutes')}
               />

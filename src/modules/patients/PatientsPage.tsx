@@ -61,21 +61,21 @@ export function PatientsPage() {
       <PageHeader
         actions={
           <Link
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"
             to="/patients/new"
           >
             <UserRoundPlus className="h-4 w-4" aria-hidden="true" />
             Nuevo paciente
           </Link>
         }
-        eyebrow="Profiles"
+        eyebrow="Perfiles"
         title="Pacientes"
       />
       <FormError
         message={patientsQuery.isError ? `No se pudo cargar tu equipo de cuidado. ${getApiErrorMessage(patientsQuery.error)}` : null}
       />
 
-      <div className="grid grid-cols-[1fr_340px] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[1fr_340px]">
         <Panel>
           <PanelHeader eyebrow="Equipo de cuidado" title="Mis pacientes" />
           <PanelBody className="space-y-4">
@@ -93,8 +93,8 @@ export function PatientsPage() {
                 <thead>
                   <tr>
                     <th>Paciente</th>
-                    <th>Codigo</th>
-                    <th>Accion</th>
+                    <th>Código</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -118,33 +118,33 @@ export function PatientsPage() {
                     Nuevo paciente
                   </Button>
                 }
-                title={patientsQuery.data?.length ? 'Sin resultados' : 'Aun no tienes pacientes asignados'}
+                title={patientsQuery.data?.length ? 'Sin resultados' : 'Aún no tienes pacientes asignados'}
               />
             )}
           </PanelBody>
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Acceso rapido" title="Abrir por codigo" />
+          <PanelHeader eyebrow="Vinculación" title="Buscar por código" />
           <PanelBody className="space-y-4">
             <TextField
-              label="Codigo de paciente"
+              label="Código de paciente"
               onChange={(e) => setCodeInput(e.target.value)}
               type="number"
               value={codeInput}
             />
             {codeInput && !validCode ? (
-              <p className="text-xs font-semibold text-rose-600">Ingresa un numero valido</p>
+              <p className="text-xs font-semibold text-rose-600">Ingresa un número válido</p>
             ) : patientByCodeQuery.isFetching ? (
               <LoadingBlock />
             ) : patientByCodeQuery.data ? (
-              <div className="rounded-lg border border-teal-200 bg-teal-50 p-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Paciente encontrado</p>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <p className="text-xs font-bold uppercase tracking-wide text-blue-600">Paciente encontrado</p>
                 <p className="mt-1 font-bold text-slate-900">{patientByCodeQuery.data.fullName}</p>
-                <p className="mt-0.5 text-xs font-semibold text-slate-500">Codigo #{patientByCodeQuery.data.id}</p>
+                <p className="mt-0.5 text-xs font-semibold text-slate-500">Código #{patientByCodeQuery.data.id}</p>
                 {!patientByCodeIsAssigned ? (
                   <p className="mt-2 text-xs font-semibold leading-5 text-amber-800">
-                    Este paciente aun no pertenece a tu equipo de cuidado.
+                    Este paciente aún no pertenece a tu equipo de cuidado.
                   </p>
                 ) : null}
                 <Button
@@ -164,7 +164,7 @@ export function PatientsPage() {
                 </Button>
               </div>
             ) : patientByCodeQuery.isError ? (
-              <p className="text-xs font-semibold text-rose-600">No se encontro un paciente con ese codigo</p>
+              <p className="text-xs font-semibold text-rose-600">No se encontró un paciente con ese código</p>
             ) : null}
           </PanelBody>
         </Panel>

@@ -103,12 +103,12 @@ export function ReportsPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Paciente activo" title={`Reportes - ${patient?.fullName ?? ''}`} />
+      <PageHeader eyebrow="Paciente vinculado" title={`Reportes - ${patient?.fullName ?? ''}`} />
       <FormError message={error} />
 
-      <div className="grid grid-cols-[420px_1fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <Panel>
-          <PanelHeader eyebrow="Reports" title="Generar reporte" />
+          <PanelHeader eyebrow="Reportes" title="Generar reporte" />
           <PanelBody>
             <form className="space-y-4" onSubmit={form.handleSubmit(submitReport)}>
               <SelectField
@@ -131,7 +131,7 @@ export function ReportsPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Historial" title="Reportes clinicos" />
+          <PanelHeader eyebrow="Historial" title="Reportes clínicos" />
           <PanelBody>
             {reportsQuery.isLoading ? (
               <LoadingBlock />

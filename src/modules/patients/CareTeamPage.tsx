@@ -53,7 +53,7 @@ export function CareTeamPage() {
   const assignDoctorMutation = useMutation({
     mutationFn: () => {
       if (!doctorProfile) {
-        throw new Error('Completa tu perfil medico antes de asignarte pacientes')
+        throw new Error('Completa tu perfil médico antes de asignarte pacientes')
       }
       return profilesApi.assignDoctor(patientId, doctorProfile.id)
     },
@@ -68,16 +68,16 @@ export function CareTeamPage() {
       setConfirmedPatientId(patientId)
       await queryClient.invalidateQueries({ queryKey: ['my-patients'] })
       saveActivePatient(patient)
-      setSuccessMessage(`Paciente vinculado correctamente mediante la asignacion #${assignment.id}.`)
+      setSuccessMessage(`Paciente vinculado correctamente mediante la asignación #${assignment.id}.`)
     } catch (submitError) {
       setError(
-        `No se pudo vincular el paciente a tu equipo. Revisa tu suscripcion institucional e intenta nuevamente. ${getApiErrorMessage(submitError)}`,
+        `No se pudo vincular el paciente a tu equipo. Revisa tu suscripción institucional e intenta nuevamente. ${getApiErrorMessage(submitError)}`,
       )
     }
   }
 
   if (!validPatientId) {
-    return <PatientAccessState message="El codigo de paciente de la ruta no es valido." />
+    return <PatientAccessState message="El código de paciente de la ruta no es válido." />
   }
   if (patientsQuery.isLoading || publicPatientQuery.isLoading) return <LoadingBlock />
   if (!patient) {
@@ -95,12 +95,12 @@ export function CareTeamPage() {
   return (
     <>
       <PageHeader
-        eyebrow={isAssigned ? 'Paciente activo' : 'Vinculacion pendiente'}
+        eyebrow={isAssigned ? 'Paciente vinculado' : 'Vinculación pendiente'}
         title={`Equipo de cuidado - ${patient.fullName}`}
       />
-      <div className="grid grid-cols-[420px_1fr] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <Panel>
-          <PanelHeader eyebrow="Profiles" title={isAssigned ? 'Relacion activa' : 'Asignar medico'} />
+          <PanelHeader eyebrow="Equipo de cuidado" title={isAssigned ? 'Relación activa' : 'Asignar médico'} />
           <PanelBody className="space-y-4">
             <FormError message={error || relationLoadError} />
             {successMessage ? (
@@ -109,9 +109,9 @@ export function CareTeamPage() {
               </div>
             ) : null}
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Medico</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Médico</p>
               <p className="mt-1 text-sm font-bold text-slate-900">
-                {doctorProfile?.fullName ?? 'Perfil medico pendiente'}
+                {doctorProfile?.fullName ?? 'Perfil médico pendiente'}
               </p>
               <p className="mt-3 text-xs font-bold uppercase tracking-wide text-slate-400">Paciente</p>
               <p className="mt-1 text-sm font-bold text-slate-900">{patient.fullName}</p>
@@ -128,9 +128,9 @@ export function CareTeamPage() {
             </Button>
             {!isAssigned ? (
               <p className="text-xs font-semibold leading-5 text-slate-600">
-                La vinculacion puede requerir una suscripcion institucional activa.{' '}
-                <Link className="font-bold text-teal-700 underline underline-offset-2" to="/subscriptions">
-                  Revisar suscripcion
+                La vinculación puede requerir una suscripción institucional activa.{' '}
+                <Link className="font-bold text-blue-600 underline underline-offset-2" to="/subscriptions">
+                  Revisar suscripción
                 </Link>
               </p>
             ) : null}
@@ -138,15 +138,15 @@ export function CareTeamPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Acceso" title="Estado de relacion clinica" />
+          <PanelHeader eyebrow="Acceso" title="Estado de relación clínica" />
           <PanelBody>
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-4">
               <div>
                 <p className="font-bold text-slate-950">Doctor y paciente</p>
                 <p className="text-sm font-semibold text-slate-600">
                   {isAssigned
-                    ? 'La relacion esta activa para citas, salud, medicacion y seguimiento.'
-                    : 'Todavia no existe una relacion clinica activa con este paciente.'}
+                    ? 'La relación está activa para citas, salud, medicación y seguimiento.'
+                    : 'Todavía no existe una relación clínica activa con este paciente.'}
                 </p>
               </div>
               <StatusBadge tone={isAssigned ? 'emerald' : 'amber'}>

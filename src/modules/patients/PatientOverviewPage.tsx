@@ -57,11 +57,11 @@ export function PatientOverviewPage() {
             Registrar signos
           </Link>
         }
-        eyebrow="Paciente activo"
+        eyebrow="Paciente vinculado"
         title={patient?.fullName ?? 'Paciente'}
       />
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Panel className="p-5">
           <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Alertas activas</p>
           <p className="mt-2 text-3xl font-bold text-slate-950">{alertsQuery.data?.length ?? '-'}</p>
@@ -80,20 +80,20 @@ export function PatientOverviewPage() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-[1fr_420px] gap-6">
+      <div className="grid gap-6 xl:grid-cols-[1fr_420px]">
         <Panel>
-          <PanelHeader eyebrow="Resumen clinico" title="Estado actual" />
+          <PanelHeader eyebrow="Resumen clínico" title="Estado actual" />
           <PanelBody>
             {summaryQuery.data?.summary ? (
               <p className="text-sm leading-6 text-slate-700">{summaryQuery.data.summary}</p>
             ) : (
-              <EmptyState title="Sin resumen clinico disponible" />
+              <EmptyState title="Sin resumen clínico disponible" />
             )}
           </PanelBody>
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Health" title="Alertas" />
+          <PanelHeader eyebrow="Salud" title="Alertas" />
           <PanelBody>
             {alertsQuery.data?.length ? (
               <div className="space-y-3">
@@ -114,7 +114,7 @@ export function PatientOverviewPage() {
         </Panel>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 xl:grid-cols-2">
         <Panel>
           <PanelHeader
             action={
@@ -122,7 +122,7 @@ export function PatientOverviewPage() {
                 Ver citas
               </Button>
             }
-            eyebrow="Appointments"
+            eyebrow="Citas"
             title="Agenda"
           />
           <PanelBody>
@@ -156,7 +156,7 @@ export function PatientOverviewPage() {
         </Panel>
 
         <Panel>
-          <PanelHeader eyebrow="Medication" title="Medicacion activa" />
+          <PanelHeader eyebrow="Medicación" title="Medicación activa" />
           <PanelBody>
             {medicationsQuery.data?.length ? (
               <table className="clinical-table">
@@ -180,7 +180,7 @@ export function PatientOverviewPage() {
                 </tbody>
               </table>
             ) : (
-              <EmptyState title="Sin medicacion registrada" />
+              <EmptyState title="Sin medicación registrada" />
             )}
           </PanelBody>
         </Panel>

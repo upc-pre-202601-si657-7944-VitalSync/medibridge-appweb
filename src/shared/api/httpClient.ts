@@ -1,4 +1,4 @@
-import axios from 'axios'
+﻿import axios from 'axios'
 import { env } from '@/config/env'
 import { clearStoredAuth, getStoredAuth } from '@/modules/auth/authStorage'
 import type { ApiErrorResponse } from '@/shared/types/api'
@@ -36,7 +36,7 @@ export function getApiErrorMessage(error: unknown) {
     const payload = error.response?.data
     const message = payload?.message || payload?.error || error.message
     if (message.includes('account or business name') && message.includes('Checkout')) {
-      return 'Stripe necesita que configures el nombre de la cuenta o negocio antes de abrir Checkout. Revisalo en Dashboard > Settings > Account details.'
+      return 'Stripe necesita que configures el nombre de la cuenta o negocio antes de abrir Checkout. Revísalo en Dashboard > Settings > Account details.'
     }
     if (message.startsWith('Stripe checkout session circuit breaker fallback: ')) {
       return message.replace('Stripe checkout session circuit breaker fallback: ', '')

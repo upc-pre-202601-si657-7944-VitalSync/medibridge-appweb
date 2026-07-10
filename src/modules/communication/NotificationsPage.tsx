@@ -50,14 +50,14 @@ export function NotificationsPage() {
   return (
     <>
       <PageHeader
-        actions={<StatusBadge tone="amber">{`${unreadNotificationsQuery.data?.length ?? 0} no leidas`}</StatusBadge>}
-        eyebrow="Communication"
+        actions={<StatusBadge tone="amber">{`${unreadNotificationsQuery.data?.length ?? 0} no leídas`}</StatusBadge>}
+        eyebrow="Comunicación"
         title="Notificaciones"
       />
       <FormError message={error} />
 
       <Panel>
-        <PanelHeader eyebrow="Eventos" title="Bandeja" />
+        <PanelHeader eyebrow="Eventos clínicos" title="Bandeja de atención" />
         <PanelBody>
           {notificationsQuery.isLoading ? (
             <LoadingBlock />
@@ -67,10 +67,10 @@ export function NotificationsPage() {
                 <tr>
                   <th>Estado</th>
                   <th>Tipo</th>
-                  <th>Titulo</th>
+                  <th>Título</th>
                   <th>Paciente</th>
                   <th>Fecha</th>
-                  <th>Accion</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -97,7 +97,7 @@ export function NotificationsPage() {
                         variant="secondary"
                       >
                         <CheckCheck className="h-4 w-4" aria-hidden="true" />
-                        Leida
+                        Leída
                       </Button>
                     </td>
                   </tr>

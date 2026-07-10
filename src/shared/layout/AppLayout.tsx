@@ -27,7 +27,7 @@ const primaryNav = [
   { icon: LayoutDashboard, label: 'Dashboard', to: '/dashboard' },
   { icon: UsersRound, label: 'Pacientes', to: '/patients' },
   { icon: Pill, label: 'Centro de medicación', to: '/medications' },
-  { icon: CreditCard, label: 'Suscripcion', to: '/subscriptions' },
+  { icon: CreditCard, label: 'Suscripción', to: '/subscriptions' },
   { icon: MessageSquareText, label: 'Chat', to: '/chat' },
   { icon: Bell, label: 'Notificaciones', to: '/notifications' },
 ]
@@ -39,8 +39,27 @@ const patientNav = [
   { icon: Pill, label: 'Medicación', suffix: '/medications' },
   { icon: HeartPulse, label: 'Salud', suffix: '/health' },
   { icon: FileText, label: 'Reportes', suffix: '/reports' },
-  { icon: ChartNoAxesCombined, label: 'Analitica', suffix: '/analytics' },
+  { icon: ChartNoAxesCombined, label: 'Analítica', suffix: '/analytics' },
 ]
+
+function getPageTitle(pathname: string) {
+  if (pathname === '/dashboard') return 'Dashboard'
+  if (pathname === '/onboarding/doctor') return 'Perfil médico'
+  if (pathname === '/patients/new') return 'Nuevo paciente'
+  if (pathname === '/patients') return 'Pacientes'
+  if (pathname === '/medications') return 'Centro de medicación'
+  if (pathname === '/subscriptions') return 'Suscripción'
+  if (pathname === '/chat') return 'Chat'
+  if (pathname === '/notifications') return 'Notificaciones'
+  if (/^\/patients\/[^/]+\/care-team$/.test(pathname)) return 'Equipo de cuidado'
+  if (/^\/patients\/[^/]+\/appointments$/.test(pathname)) return 'Citas'
+  if (/^\/patients\/[^/]+\/medications$/.test(pathname)) return 'Medicación'
+  if (/^\/patients\/[^/]+\/health$/.test(pathname)) return 'Salud'
+  if (/^\/patients\/[^/]+\/reports$/.test(pathname)) return 'Reportes'
+  if (/^\/patients\/[^/]+\/analytics$/.test(pathname)) return 'Analítica'
+  if (/^\/patients\/[^/]+$/.test(pathname)) return 'Vista 360'
+  return 'MediBridge'
+}
 
 function SidebarLink({
   end,
@@ -59,7 +78,7 @@ function SidebarLink({
       className={({ isActive }) =>
         [
           'flex h-10 items-center gap-3 rounded-lg px-3 text-sm font-semibold transition',
-          isActive ? 'bg-teal-700 text-white' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950',
+          isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white',
         ].join(' ')
       }
       to={to}
@@ -95,24 +114,29 @@ export function AppLayout() {
   }, [user?.id])
 
   useEffect(() => {
-    const activePatient = workspace.activePatient
-    if (!activePatient || !patientsQuery.isSuccess || patientsQuery.isFetching) return
-    const stillAssigned = patientsQuery.data.some((patient) => patient.id === activePatient.id)
+    const selectedPatient = workspace.activePatient
+    if (!selectedPatient || !patientsQuery.isSuccess || patientsQuery.isFetching) return
+    const stillAssigned = patientsQuery.data.some((patient) => patient.id === selectedPatient.id)
     if (!stillAssigned) clearActivePatient(user?.id)
   }, [patientsQuery.data, patientsQuery.isFetching, patientsQuery.isSuccess, user?.id, workspace.activePatient])
 
-  const activePatient = workspace.activePatient
+  const selectedPatient = workspace.activePatient
+  const activePatient =
+    selectedPatient && patientsQuery.isSuccess
+      ? patientsQuery.data.find((patient) => patient.id === selectedPatient.id) ?? null
+      : null
+  const pageTitle = getPageTitle(pathname)
 
   return (
     <div className="app-shell">
-      <aside className="flex min-h-screen flex-col border-r border-slate-200 bg-white px-4 py-5">
+      <aside className="flex min-h-screen flex-col border-r border-slate-800 bg-slate-900 px-4 py-5 text-white">
         <div className="mb-8 flex items-center gap-3 px-2">
-          <div className="grid h-10 w-10 place-items-center rounded-lg bg-teal-700 text-white">
+          <div className="grid h-10 w-10 place-items-center rounded-lg bg-blue-600 text-white">
             <Stethoscope className="h-6 w-6" aria-hidden="true" />
           </div>
           <div>
-            <p className="text-lg font-bold leading-none text-slate-950">MediBridge</p>
-            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-teal-700">Clinical Web</p>
+            <p className="text-lg font-bold leading-none text-white">MediBridge</p>
+            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-blue-200">Clinical Web</p>
           </div>
         </div>
 
@@ -123,10 +147,10 @@ export function AppLayout() {
         </nav>
 
         {activePatient ? (
-          <div className="mt-8 border-t border-slate-200 pt-5">
+          <div className="mt-8 border-t border-slate-700 pt-5">
             <div className="mb-3 px-2">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Paciente activo</p>
-              <p className="mt-1 truncate text-sm font-bold text-slate-900">{activePatient.fullName}</p>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Paciente vinculado</p>
+              <p className="mt-1 truncate text-sm font-bold text-white">{activePatient.fullName}</p>
             </div>
             <nav className="space-y-1">
               {patientNav.map((item) => (
@@ -142,30 +166,30 @@ export function AppLayout() {
           </div>
         ) : null}
 
-        <div className="mt-auto space-y-3 border-t border-slate-200 pt-5">
+        <div className="mt-auto space-y-3 border-t border-slate-700 pt-5">
           {workspace.doctorProfile ? (
-            <div className="rounded-lg bg-slate-50 p-3">
-              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Perfil medico</p>
-              <p className="mt-1 truncate text-sm font-bold text-slate-900">{workspace.doctorProfile.fullName}</p>
-              <p className="text-xs font-semibold text-slate-500">Perfil activo</p>
+            <div className="rounded-xl bg-white/5 p-3">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Perfil médico</p>
+              <p className="mt-1 truncate text-sm font-bold text-white">{workspace.doctorProfile.fullName}</p>
+              <p className="text-xs font-semibold text-slate-400">Perfil activo</p>
             </div>
           ) : null}
           <Button className="w-full" onClick={signOut} variant="secondary">
             <LogOut className="h-4 w-4" aria-hidden="true" />
-            Cerrar sesion
+            Cerrar sesión
           </Button>
         </div>
       </aside>
 
       <main className="min-w-0">
-        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/90 px-8 backdrop-blur">
+        <header className="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/95 px-8 backdrop-blur">
           <div className="flex items-center gap-3">
-            <Activity className="h-5 w-5 text-teal-700" aria-hidden="true" />
-            <span className="text-sm font-bold text-slate-700">{pathname}</span>
+            <Activity className="h-5 w-5 text-blue-600" aria-hidden="true" />
+            <span className="text-sm font-bold text-slate-900">{pageTitle}</span>
           </div>
           <div className="flex items-center gap-3">
-            <StatusBadge tone={activePatient ? 'teal' : 'amber'}>
-              {activePatient ? activePatient.fullName : 'Sin paciente'}
+            <StatusBadge tone={activePatient ? 'blue' : 'amber'}>
+              {activePatient ? activePatient.fullName : 'Sin paciente vinculado'}
             </StatusBadge>
             <span className="text-sm font-semibold text-slate-600">{user?.username}</span>
           </div>

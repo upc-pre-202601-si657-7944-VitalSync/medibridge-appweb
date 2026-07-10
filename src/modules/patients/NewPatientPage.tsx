@@ -36,7 +36,7 @@ export function NewPatientPage() {
   async function createPatient(values: PatientForm) {
     setError(null)
     if (!doctorProfile) {
-      setError('Completa tu perfil medico antes de crear pacientes')
+      setError('Completa tu perfil médico antes de crear pacientes')
       return
     }
 
@@ -52,7 +52,7 @@ export function NewPatientPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Profiles" title="Nuevo paciente" />
+      <PageHeader eyebrow="Perfiles" title="Nuevo paciente" />
       <div className="max-w-2xl">
         <Panel>
           <PanelHeader eyebrow="Perfil de paciente" title="Crear paciente" />
@@ -61,9 +61,9 @@ export function NewPatientPage() {
               <FormError message={error} />
               {error ? (
                 <p className="text-sm font-semibold text-slate-600">
-                  La creacion atomica requiere acceso institucional valido.{' '}
-                  <Link className="font-bold text-teal-700 underline underline-offset-2" to="/subscriptions">
-                    Revisar suscripcion
+                  La creación y vinculación automática requiere acceso institucional válido.{' '}
+                  <Link className="font-bold text-blue-600 underline underline-offset-2" to="/subscriptions">
+                    Revisar suscripción
                   </Link>
                 </p>
               ) : null}
